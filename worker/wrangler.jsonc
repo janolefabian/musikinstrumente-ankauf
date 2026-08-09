@@ -3,11 +3,25 @@
   "name": "musikinstrument-ankauf-api",
   "main": "src/index.js",
   "compatibility_date": "2026-08-01",
+
   "vars": {
     "ALLOWED_ORIGIN": "http://localhost:4321",
     "OPENAI_MODEL": "gpt-5.6-luna",
-    "REVIEW_BASE_URL": "http://localhost:4321"
+    "REVIEW_BASE_URL": "http://localhost:4321",
   },
-  "r2_buckets": [{"binding":"PHOTOS","bucket_name":"musikinstrument-ankauf-photos"}],
-  "d1_databases": [{"binding":"LEADS","database_name":"musikinstrument-ankauf-leads","database_id":"REPLACE_WITH_D1_ID"}]
+
+  "r2_buckets": [
+    {
+      "binding": "PHOTOS",
+      "bucket_name": "musikinstrument-ankauf-photos",
+    },
+  ],
+
+  "d1_databases": [
+    {
+      "binding": "LEADS",
+      "database_name": "musikinstrument-ankauf-leads",
+      "database_id": "36171733-d97d-466c-aab2-60b2788b09bc",
+    },
+  ],
 }
