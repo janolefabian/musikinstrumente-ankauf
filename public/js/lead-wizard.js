@@ -62,6 +62,14 @@
   function isAIType(type){ return ['double_bass','bow','strings','estate','unknown'].includes(type); }
   function flow(){ return FLOWS[state.classifiedType || state.type] || []; }
   function setProgress(value){ progress.style.width = `${Math.max(5, Math.min(100,value))}%`; }
+  function renderStage(html){
+    stage.style.transition = 'none';
+    stage.style.opacity = '0';
+    stage.innerHTML = html;
+    void stage.offsetWidth;
+    stage.style.transition = 'opacity .22s ease';
+    stage.style.opacity = '1';
+  }
   function push(next){ state.history.push({step:state.step, photoIndex:state.photoIndex}); state.step=next; render(); }
   function goBack(){ const last=state.history.pop(); if(!last)return; state.step=last.step; state.photoIndex=last.photoIndex; render(); }
   back.addEventListener('click',goBack);
@@ -70,19 +78,20 @@
 
   function typeScreen(){
     setProgress(8); back.hidden=true;
-    stage.innerHTML=`<h2 class="wizard-title">Was möchten Sie anbieten?</h2><p class="wizard-copy">Wählen Sie einfach die passendste Kategorie. „Ich weiß es nicht“ ist völlig in Ordnung.</p><div class="choice-grid">${TYPES.map(([id,title,copy])=>`<button class="choice" data-type="${id}"><strong>${title}</strong><small>${copy}</small></button>`).join('')}</div>`;
+    renderStage(`<h2 class="wizard-title">Was möchten Sie anbieten?</h2><p class="wizard-copy">Wählen Sie einfach die passendste Kategorie. „Ich weiß es nicht“ ist völlig in Ordnung.</p><div class="choice-grid">${TYPES.map(([id,title,copy])=>`<button class="choice" data-type="${id}"><strong>${title}</strong><small>${copy}</small></button>`).join('')}</div>`);
     stage.querySelectorAll('[data-type]').forEach(b=>b.onclick=()=>chooseType(b.dataset.type));
   }
 
-  function helpMarkup(item){ return `<button type="button" class="help-button" data-help> ? Wo ist das?</button><div class="help-box" data-help-box hidden><strong>Beispiel / Erklärung</strong><p>${item[3]}</p><div class="help-placeholder">Hier kommt Ihr echtes Beispielbild hin</div></div>`; }
+  function helpMarkup(item){ return item[3] ? `<button type="button" class="help-button" data-help>Beispiel ansehen</button><div class="help-box" data-help-box hidden><strong>Beispiel / Erklärung</strong><p>${item[3]}</p><div class="help-placeholder">Beispielbild</div></div>` : ''; }
 
   function photoScreen(){
     const items=flow(); const item=items[state.photoIndex];
     if(!item){ push('details'); return; }
     const pct=15 + Math.round((state.photoIndex/items.length)*48); setProgress(pct); back.hidden=false;
-    const early=state.photos.length>=2?`<div class="early-submit"><button class="help-button" type="button" data-early>Weiter mit den bisherigen Fotos</button></div>`:'';
-    stage.innerHTML=`<p class="eyebrow">Foto ${state.photoIndex+1} von ${items.length}</p><h2 class="wizard-title">${item[1]}</h2><p class="wizard-copy">${item[2]}</p>${helpMarkup(item)}<div class="photo-frame"><input type="file" accept="image/*" capture="environment" data-file hidden><div data-preview><p>Noch kein Foto aufgenommen.</p></div><div class="photo-actions"><button type="button" class="photo-button" data-camera>Foto aufnehmen</button><button type="button" class="ghost-button" data-library>Aus Mediathek wählen</button></div><div data-quality></div></div>${early}`;
-    const help=stage.querySelector('[data-help]'), helpBox=stage.querySelector('[data-help-box]'); help.onclick=()=>helpBox.hidden=!helpBox.hidden;
+    const dots = items.map((_,idx)=>`<span class="photo-dot${idx===state.photoIndex?' active':''}" aria-hidden="true"></span>`).join('');
+    const early=state.photos.length>=2?`<div class="early-submit"><button class="ghost-button" type="button" data-early>Continue with the current photos</button></div>`:'';
+    renderStage(`<div class="photo-step"><div class="photo-step-header"><p class="eyebrow">Foto ${state.photoIndex+1} von ${items.length}</p><div class="photo-progress-dots">${dots}</div></div><h2 class="wizard-title">${item[1]}</h2><p class="wizard-copy">${item[2]}</p><div class="photo-step-grid"><div class="photo-instructions">${helpMarkup(item)}<div class="photo-frame"><input type="file" accept="image/*" capture="environment" data-file hidden><div data-preview><p>Noch kein Foto aufgenommen.</p></div><div class="photo-actions"><button type="button" class="photo-button" data-camera>Foto aufnehmen</button><button type="button" class="ghost-button" data-library>Aus Mediathek wählen</button></div><div data-quality></div></div></div></div>${early}</div>`);
+    const help=stage.querySelector('[data-help]'); if(help){ const helpBox=stage.querySelector('[data-help-box]'); help.onclick=()=>{ helpBox.hidden = !helpBox.hidden; }; }
     const file=stage.querySelector('[data-file]'); stage.querySelector('[data-camera]').onclick=()=>{file.setAttribute('capture','environment');file.click()}; stage.querySelector('[data-library]').onclick=()=>{file.removeAttribute('capture');file.click()};
     const earlyButton=stage.querySelector('[data-early]'); if(earlyButton)earlyButton.onclick=()=>push('details');
     file.onchange=async()=>{ const selected=file.files?.[0]; if(!selected)return; await handlePhoto(selected,item); };

@@ -8,13 +8,13 @@ const local = Boolean(cityName);
   <div class="hero-overlay"></div>
   <div class="hero-content">
     <p class="eyebrow hero-eyebrow">{local ? `Ankauf in ${cityName}` : 'Musikinstrument Ankauf'}</p>
-    <h1>{local ? `Musikinstrumente in ${cityName} verkaufen` : 'Sie möchten ein Musikinstrument verkaufen?'}</h1>
-    <p>Schicken Sie uns einfach einige Fotos und die Informationen, die Sie haben. Sie müssen Hersteller, Alter oder Herkunft nicht selbst einordnen.</p>
+    <h1>{local ? `Instrument in ${cityName} zeigen` : 'Ein Instrument einfach zeigen'}</h1>
+    <p>Schicken Sie uns ein paar Fotos. Sie brauchen nicht selbst zu wissen, welcher Hersteller, welches Alter oder welcher Wert dahintersteckt. Wir sehen uns Ihre Anfrage persönlich an.</p>
     <a class="button primary" href={`/instrument-verkaufen/${local ? `?city=${encodeURIComponent(cityName)}` : ''}`}>Instrument anbieten</a>
     <div class="trust-row" aria-label="Vorteile">
-      <span>Einfach und unverbindlich</span>
-      <span>Persönliche Prüfung</span>
-      <span>Auch Nachlässe und Sammlungen</span>
+      <span>Fotos reichen für den ersten Schritt</span>
+      <span>Kein Expertenwissen nötig</span>
+      <span>Die Anfrage wird persönlich geprüft</span>
     </div>
   </div>
 </section>
