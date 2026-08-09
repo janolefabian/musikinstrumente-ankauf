@@ -1,0 +1,12 @@
+---
+const apiBase = import.meta.env.PUBLIC_API_BASE || '';
+---
+<section class="wizard-shell" data-lead-wizard data-api-base={apiBase}>
+  <div class="wizard-progress"><span data-progress-fill></span></div>
+  <div class="wizard-card" aria-live="polite">
+    <button class="wizard-back" type="button" data-back hidden>← Zurück</button>
+    <div data-wizard-stage></div>
+  </div>
+  <noscript>Für den geführten Foto-Assistenten muss JavaScript aktiviert sein.</noscript>
+</section>
+<script src="/js/lead-wizard.js" is:inline></script>

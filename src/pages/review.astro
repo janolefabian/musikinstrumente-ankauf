@@ -1,0 +1,20 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+const apiBase = import.meta.env.PUBLIC_API_BASE || '';
+---
+<BaseLayout title="Review – Musikinstrument Ankauf">
+  <section class="review-page" data-review data-api-base={apiBase}>
+    <div class="review-header">
+      <div><p class="eyebrow">Intern</p><h1>Anfragen</h1></div>
+      <div class="review-tabs">
+        <button data-filter="urgent">Sofort</button>
+        <button data-filter="notable">Auffällig</button>
+        <button data-filter="week">Diese Woche</button>
+        <button data-filter="all" class="active">Alle</button>
+      </div>
+    </div>
+    <div class="review-grid" data-review-grid></div>
+    <div class="review-detail" data-review-detail hidden></div>
+  </section>
+  <script src="/js/review.js" is:inline></script>
+</BaseLayout>

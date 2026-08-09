@@ -1,0 +1,64 @@
+---
+import Testimonials from './Testimonials.astro';
+import CityLinks from './CityLinks.astro';
+const { cityName } = Astro.props;
+const local = Boolean(cityName);
+---
+<section class="hero">
+  <div class="hero-overlay"></div>
+  <div class="hero-content">
+    <p class="eyebrow hero-eyebrow">{local ? `Ankauf in ${cityName}` : 'Musikinstrument Ankauf'}</p>
+    <h1>{local ? `Musikinstrumente in ${cityName} verkaufen` : 'Sie möchten ein Musikinstrument verkaufen?'}</h1>
+    <p>Schicken Sie uns einfach einige Fotos und die Informationen, die Sie haben. Sie müssen Hersteller, Alter oder Herkunft nicht selbst einordnen.</p>
+    <a class="button primary" href={`/instrument-verkaufen/${local ? `?city=${encodeURIComponent(cityName)}` : ''}`}>Instrument anbieten</a>
+    <div class="trust-row" aria-label="Vorteile">
+      <span>Einfach und unverbindlich</span>
+      <span>Persönliche Prüfung</span>
+      <span>Auch Nachlässe und Sammlungen</span>
+    </div>
+  </div>
+</section>
+
+<section class="section intro" id="so-funktionierts">
+  <div class="section-inner narrow">
+    <p class="eyebrow">So funktioniert es</p>
+    <h2>Zeigen Sie uns, was Sie haben.</h2>
+    <p class="section-lead">Einige gute Fotos reichen für den Anfang. Die Website führt Sie Schritt für Schritt durch die Aufnahme. Fachbegriffe müssen Sie nicht kennen.</p>
+    <div class="steps">
+      <div><strong>1</strong><span>Instrument auswählen</span></div>
+      <div><strong>2</strong><span>Geführt Fotos aufnehmen</span></div>
+      <div><strong>3</strong><span>Kurze Angaben ergänzen</span></div>
+      <div><strong>4</strong><span>Anfrage persönlich prüfen lassen</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="section inheritance">
+  <div class="section-inner split">
+    <div>
+      <p class="eyebrow">Nachlass oder Sammlung</p>
+      <h2>Mehrere Instrumente, Bögen oder Koffer?</h2>
+      <p>Fotografieren Sie zunächst einfach alles, was zusammengehört. Auch Bögen, Etiketten, Stempel, Rechnungen oder alte Koffer können wichtige Hinweise liefern.</p>
+      <a class="button secondary" href="/instrument-verkaufen/?type=estate">Nachlass zeigen</a>
+    </div>
+    <div class="quiet-card">
+      <strong>Keine Fachkenntnisse nötig.</strong>
+      <p>Wenn Sie nicht genau wissen, ob es sich um eine Geige, einen Kontrabass oder einen Bogen handelt, wählen Sie einfach „Ich weiß es nicht“.</p>
+    </div>
+  </div>
+</section>
+
+<Testimonials />
+
+<section class="section expertise">
+  <div class="section-inner split">
+    <div>
+      <p class="eyebrow">Fachliche Prüfung</p>
+      <h2>Streichinstrumente und Bögen im besonderen Fokus.</h2>
+      <p>Die Anfrage wird nicht automatisch bewertet oder abgelehnt. Fotos und Angaben werden persönlich angesehen. Bei Streichinstrumenten hilft die digitale Führung zusätzlich dabei, die relevanten Details vollständig zu dokumentieren.</p>
+    </div>
+    <img src="/images/violine.jpg" alt="Detail eines Streichinstruments" loading="lazy" />
+  </div>
+</section>
+
+{!local && <CityLinks />}

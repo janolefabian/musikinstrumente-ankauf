@@ -1,0 +1,42 @@
+---
+import '../styles/global.css';
+import { site } from '../config/site';
+
+const {
+  title = site.name,
+  description = 'Musikinstrumente unkompliziert anbieten. Fotos senden, Anfrage persönlich prüfen lassen.',
+  canonical
+} = Astro.props;
+const canonicalUrl = canonical ? new URL(canonical, Astro.site) : Astro.url;
+---
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonicalUrl} />
+    <link rel="icon" href="/favicon.ico" />
+    <title>{title}</title>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/">Musikinstrument <span>Ankauf</span></a>
+      <nav aria-label="Hauptnavigation">
+        <a href="/#so-funktionierts">So funktioniert es</a>
+        <a href="/instrument-verkaufen/" class="nav-cta">Instrument anbieten</a>
+      </nav>
+    </header>
+    <main><slot /></main>
+    <footer class="site-footer">
+      <div>
+        <strong>Musikinstrument Ankauf</strong>
+        <span>Deutschlandweiter Ankauf und persönliche Prüfung von Instrumentenanfragen.</span>
+      </div>
+      <nav>
+        <a href="/impressum/">Impressum</a>
+        <a href="/datenschutz/">Datenschutz</a>
+      </nav>
+    </footer>
+  </body>
+</html>

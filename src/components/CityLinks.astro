@@ -1,0 +1,13 @@
+---
+import { cities } from '../data/cities';
+---
+<section class="section city-section" aria-labelledby="city-title">
+  <div class="section-inner">
+    <p class="eyebrow">In Ihrer Region</p>
+    <h2 id="city-title">Musikinstrumente verkaufen in Ihrer Stadt</h2>
+    <p class="section-lead">Für viele Regionen gibt es eine eigene Informationsseite. Die Anfrage selbst bleibt überall gleich einfach.</p>
+    <div class="city-links">
+      {cities.map((city) => <a href={`/${city.slug}/`}>{city.name}</a>)}
+    </div>
+  </div>
+</section>

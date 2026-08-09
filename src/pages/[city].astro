@@ -1,0 +1,17 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import HomeContent from '../components/HomeContent.astro';
+import { cities } from '../data/cities';
+
+export function getStaticPaths() {
+  return cities.map((city) => ({ params: { city: city.slug }, props: { city } }));
+}
+const { city } = Astro.props;
+---
+<BaseLayout
+  title={`Musikinstrumente Ankauf ${city.name} – Instrument verkaufen`}
+  description={`Musikinstrument in ${city.name} verkaufen. Fotos senden, Anfrage unkompliziert und persönlich prüfen lassen.`}
+  canonical={`/${city.slug}/`}
+>
+  <HomeContent cityName={city.name} />
+</BaseLayout>
