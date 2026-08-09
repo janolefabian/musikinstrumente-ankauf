@@ -3,18 +3,49 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 const apiBase = import.meta.env.PUBLIC_API_BASE || '';
 ---
 <BaseLayout title="Review – Musikinstrument Ankauf">
-  <section class="review-page" data-review data-api-base={apiBase}>
-    <div class="review-header">
-      <div><p class="eyebrow">Intern</p><h1>Anfragen</h1></div>
-      <div class="review-tabs">
-        <button data-filter="urgent">Sofort</button>
-        <button data-filter="notable">Auffällig</button>
-        <button data-filter="week">Diese Woche</button>
-        <button data-filter="all" class="active">Alle</button>
+  <section class="review-page review-shell" data-review data-api-base={apiBase}>
+    <header class="review-header review-toolbar">
+      <div>
+        <p class="eyebrow">Intern</p>
+        <h1>Anfragen</h1>
       </div>
+      <div class="review-search-wrap">
+        <label class="sr-only" for="review-search">Anfragen durchsuchen</label>
+        <input id="review-search" class="review-search" type="search" placeholder="Name, Ort, Hersteller, Lead-ID …" autocomplete="off" data-review-search />
+        <span class="review-result-count" data-result-count></span>
+      </div>
+    </header>
+
+    <div class="review-tabs" role="tablist" aria-label="Anfragen filtern">
+      <button data-filter="urgent">Sofort <span data-count="urgent"></span></button>
+      <button data-filter="notable">Auffällig <span data-count="notable"></span></button>
+      <button data-filter="week">Diese Woche <span data-count="week"></span></button>
+      <button data-filter="c">C-Leads <span data-count="c"></span></button>
+      <button data-filter="all" class="active">Alle <span data-count="all"></span></button>
     </div>
-    <div class="review-grid" data-review-grid></div>
-    <div class="review-detail" data-review-detail hidden></div>
+
+    <div class="review-workspace">
+      <aside class="review-list-pane" aria-label="Anfrageliste">
+        <div class="review-list" data-review-grid></div>
+      </aside>
+      <main class="review-detail-pane" data-review-detail>
+        <div class="review-empty-state">
+          <p class="eyebrow">Auswahl</p>
+          <h2>Anfrage auswählen</h2>
+          <p>Links eine Anfrage öffnen. Mit <kbd>J</kbd> und <kbd>K</kbd> können Sie später schnell durch die Liste gehen.</p>
+        </div>
+      </main>
+    </div>
+
+    <div class="review-lightbox" data-lightbox hidden aria-hidden="true">
+      <button class="lightbox-close" type="button" data-lightbox-close aria-label="Bild schließen">×</button>
+      <button class="lightbox-nav lightbox-prev" type="button" data-lightbox-prev aria-label="Vorheriges Bild">‹</button>
+      <figure>
+        <img data-lightbox-image alt="Vergrößerte Instrumentenaufnahme" />
+        <figcaption data-lightbox-caption></figcaption>
+      </figure>
+      <button class="lightbox-nav lightbox-next" type="button" data-lightbox-next aria-label="Nächstes Bild">›</button>
+    </div>
   </section>
   <script src="/js/review.js" is:inline></script>
 </BaseLayout>

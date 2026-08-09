@@ -96,7 +96,7 @@ async function reviewList(request,env){
  if(!authorized(request,env))return json({error:'unauthorized'},401,env);
  const {results}=await env.LEADS.prepare(`SELECT * FROM leads ORDER BY created_at DESC LIMIT 300`).all(); const out=[];
  for(const l of results){const photo=await env.LEADS.prepare(`SELECT id FROM photos WHERE lead_id=? ORDER BY created_at LIMIT 1`).bind(l.id).first();let parsed={};try{parsed=JSON.parse(l.ai_json||'{}')}catch{}
-  out.push({id:l.id,class:l.lead_class,notable:Boolean(l.notable),title:parsed.title||l.type||'Anfrage',city:l.city,summary:l.summary,score:l.interest_score,confidence:l.confidence,status:l.status,make_status:l.make_status,created_at:l.created_at,image:photo?`${new URL(request.url).origin}/api/photo/${photo.id}`:null});}
+  out.push({id:l.id,class:l.lead_class,notable:Boolean(l.notable),title:parsed.title||l.type||'Anfrage',type:l.type,classified_type:l.classified_type,name:l.name,email:l.email,phone:l.phone,maker:l.maker,city:l.city,summary:l.summary,score:l.interest_score,confidence:l.confidence,status:l.status,make_status:l.make_status,photo_count:l.photo_count,created_at:l.created_at,image:photo?`${new URL(request.url).origin}/api/photo/${photo.id}`:null});}
  return json(out,200,env);
 }
 async function reviewDetail(request,leadId,env){
@@ -110,6 +110,21 @@ async function updateLead(request,leadId,env){
  const body=await request.json().catch(()=>({})); const allowed=['new','contacted','interesting','purchased','declined','archived']; if(!allowed.includes(body.status))return json({error:'invalid_status'},400,env);
  await env.LEADS.prepare(`UPDATE leads SET status=? WHERE id=?`).bind(body.status,leadId).run();return json({ok:true,status:body.status},200,env);
 }
+
+async function deleteLead(request,leadId,env){
+    if(!authorized(request,env))return json({error:'unauthorized'},401,env);
+    // fetch photos for lead
+    const {results:photos} = await env.LEADS.prepare(`SELECT object_key FROM photos WHERE lead_id=?`).bind(leadId).all();
+    // delete objects from R2 if present
+    for(const p of photos){
+        try{ if(p && p.object_key) await env.PHOTOS.delete(p.object_key); }catch(e){console.error('R2 delete failed',e);} 
+    }
+    // delete photo rows
+    await env.LEADS.prepare(`DELETE FROM photos WHERE lead_id=?`).bind(leadId).run();
+    // delete lead row
+    await env.LEADS.prepare(`DELETE FROM leads WHERE id=?`).bind(leadId).run();
+    return json({ok:true},200,env);
+}
 async function servePhoto(request,photoId,env){
  if(!authorized(request,env))return json({error:'unauthorized'},401,env);
  const row=await env.LEADS.prepare(`SELECT object_key,content_type FROM photos WHERE id=?`).bind(photoId).first();if(!row)return new Response('Not found',{status:404,headers:cors(env)});const obj=await env.PHOTOS.get(row.object_key);if(!obj)return new Response('Not found',{status:404,headers:cors(env)});return new Response(obj.body,{headers:{'Content-Type':row.content_type||'image/jpeg','Cache-Control':'private, max-age=300',...cors(env)}})
@@ -122,7 +137,7 @@ export default {async fetch(request,env,ctx){
   if(url.pathname==='/api/photo-check'&&request.method==='POST')return photoCheck(request,env);
   if(url.pathname==='/api/leads'&&request.method==='POST')return createLead(request,env,ctx);
   if(url.pathname==='/api/review'&&request.method==='GET')return reviewList(request,env);
-  const detail=url.pathname.match(/^\/api\/review\/([^/]+)$/); if(detail&&request.method==='GET')return reviewDetail(request,decodeURIComponent(detail[1]),env); if(detail&&request.method==='PATCH')return updateLead(request,decodeURIComponent(detail[1]),env);
+    const detail=url.pathname.match(/^\/api\/review\/([^/]+)$/); if(detail&&request.method==='GET')return reviewDetail(request,decodeURIComponent(detail[1]),env); if(detail&&request.method==='PATCH')return updateLead(request,decodeURIComponent(detail[1]),env); if(detail&&request.method==='DELETE')return deleteLead(request,decodeURIComponent(detail[1]),env);
   if(url.pathname.startsWith('/api/photo/')&&request.method==='GET')return servePhoto(request,url.pathname.split('/').pop(),env);
   return json({error:'not found'},404,env);
  }catch(e){console.error(e);return json({error:'server_error'},500,env);}
