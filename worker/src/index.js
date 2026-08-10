@@ -1,23 +1,25 @@
 import { PHOTO_PROMPT, LEAD_PROMPT } from "./prompt.js";
 
-function cors(request, env) {
-  const origin = request?.headers?.get("Origin") || "";
+const DEFAULT_ALLOWED_ORIGINS = [
+  "http://localhost:4321",
+  "http://localhost:4322",
+  "https://janolefabian.github.io",
+  "https://musikinstrument-ankauf.de",
+  "https://www.musikinstrument-ankauf.de",
+];
 
-  const allowedOrigins = new Set([
-    "http://localhost:4321",
-    "http://localhost:4322",
-    "https://janolefabian.github.io",
-    "https://musikinstrument-ankauf.de",
-    "https://www.musikinstrument-ankauf.de",
-  ]);
-
-  // Optional additional origins from Wrangler config:
-  // "https://example.com,https://another.example.com"
+function getAllowedOrigins(env) {
+  const allowed = new Set(DEFAULT_ALLOWED_ORIGINS);
   for (const value of (env.ALLOWED_ORIGINS || "").split(",")) {
-    const trimmed = value.trim();
-    if (trimmed) allowedOrigins.add(trimmed);
+    const origin = value.trim();
+    if (origin) allowed.add(origin);
   }
+  return allowed;
+}
 
+function cors(request, env) {
+  const origin = request.headers.get("Origin") || "";
+  const allowedOrigins = getAllowedOrigins(env);
   const headers = {
     "Access-Control-Allow-Methods": "GET,POST,PATCH,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type,Authorization",
@@ -30,13 +32,29 @@ function cors(request, env) {
 
   return headers;
 }
-function json(data, status = 200, request, env = {}) {
+
+function json(data, status = 200, request = null, env = null) {
+  let req = null;
+  let environment = null;
+
+  if (request instanceof Request) {
+    req = request;
+    environment = env;
+  } else if (request && typeof request === "object" && request.headers) {
+    req = request;
+    environment = env;
+  } else {
+    environment = request;
+  }
+
+  const headers = {
+    "content-type": "application/json; charset=utf-8",
+    ...(req && environment ? cors(req, environment) : {}),
+  };
+
   return new Response(JSON.stringify(data), {
     status,
-    headers: {
-      "content-type": "application/json; charset=utf-8",
-      ...cors(request, env),
-    },
+    headers,
   });
 }
 function id(prefix = "ANK") {
@@ -93,14 +111,19 @@ async function blobDataUrl(blob) {
 
 async function photoCheck(request, env) {
   if (!env.OPENAI_API_KEY)
-    return json({ ok: true, message: "Foto ist brauchbar." }, 200, env);
+    return json(
+      { ok: true, message: "Foto ist brauchbar." },
+      200,
+      request,
+      env,
+    );
   const fd = await request.formData();
   const image = fd.get("image");
   const expected = fd.get("expected") || "Foto";
   const instruction = fd.get("instruction") || "";
   const mode = fd.get("mode") || "quality";
   if (!(image instanceof File))
-    return json({ error: "image missing" }, 400, env);
+    return json({ error: "image missing" }, 400, request, env);
   const dataUrl = await blobDataUrl(image);
   const schema =
     mode === "identify"
@@ -156,7 +179,7 @@ async function photoCheck(request, env) {
       },
     },
   });
-  return json(JSON.parse(extractText(response)), 200, env);
+  return json(JSON.parse(extractText(response)), 200, request, env);
 }
 
 async function analyzeLead(env, meta, smallImages = []) {
@@ -366,6 +389,7 @@ async function createLead(request, env, ctx) {
       review_url: payload.review_url,
     },
     201,
+    request,
     env,
   );
 }
@@ -376,7 +400,7 @@ function authorized(request, env) {
 }
 async function reviewList(request, env) {
   if (!authorized(request, env))
-    return json({ error: "unauthorized" }, 401, env);
+    return json({ error: "unauthorized" }, 401, request, env);
   const { results } = await env.LEADS.prepare(
     `SELECT * FROM leads ORDER BY created_at DESC LIMIT 300`,
   ).all();
@@ -415,15 +439,15 @@ async function reviewList(request, env) {
         : null,
     });
   }
-  return json(out, 200, env);
+  return json(out, 200, request, env);
 }
 async function reviewDetail(request, leadId, env) {
   if (!authorized(request, env))
-    return json({ error: "unauthorized" }, 401, env);
+    return json({ error: "unauthorized" }, 401, request, env);
   const l = await env.LEADS.prepare(`SELECT * FROM leads WHERE id=?`)
     .bind(leadId)
     .first();
-  if (!l) return json({ error: "not_found" }, 404, env);
+  if (!l) return json({ error: "not_found" }, 404, request, env);
   const { results: photos } = await env.LEADS.prepare(
     `SELECT id,kind,label,content_type,created_at FROM photos WHERE lead_id=? ORDER BY created_at`,
   )
@@ -444,12 +468,13 @@ async function reviewDetail(request, leadId, env) {
       })),
     },
     200,
+    request,
     env,
   );
 }
 async function updateLead(request, leadId, env) {
   if (!authorized(request, env))
-    return json({ error: "unauthorized" }, 401, env);
+    return json({ error: "unauthorized" }, 401, request, env);
   const body = await request.json().catch(() => ({}));
   const allowed = [
     "new",
@@ -460,16 +485,16 @@ async function updateLead(request, leadId, env) {
     "archived",
   ];
   if (!allowed.includes(body.status))
-    return json({ error: "invalid_status" }, 400, env);
+    return json({ error: "invalid_status" }, 400, request, env);
   await env.LEADS.prepare(`UPDATE leads SET status=? WHERE id=?`)
     .bind(body.status, leadId)
     .run();
-  return json({ ok: true, status: body.status }, 200, env);
+  return json({ ok: true, status: body.status }, 200, request, env);
 }
 
 async function deleteLead(request, leadId, env) {
   if (!authorized(request, env))
-    return json({ error: "unauthorized" }, 401, env);
+    return json({ error: "unauthorized" }, 401, request, env);
   // fetch photos for lead
   const { results: photos } = await env.LEADS.prepare(
     `SELECT object_key FROM photos WHERE lead_id=?`,
@@ -490,26 +515,26 @@ async function deleteLead(request, leadId, env) {
     .run();
   // delete lead row
   await env.LEADS.prepare(`DELETE FROM leads WHERE id=?`).bind(leadId).run();
-  return json({ ok: true }, 200, env);
+  return json({ ok: true }, 200, request, env);
 }
 async function servePhoto(request, photoId, env) {
   if (!authorized(request, env))
-    return json({ error: "unauthorized" }, 401, env);
+    return json({ error: "unauthorized" }, 401, request, env);
   const row = await env.LEADS.prepare(
     `SELECT object_key,content_type FROM photos WHERE id=?`,
   )
     .bind(photoId)
     .first();
   if (!row)
-    return new Response("Not found", { status: 404, headers: cors(env) });
+    return new Response("Not found", { status: 404, headers: cors(request, env) });
   const obj = await env.PHOTOS.get(row.object_key);
   if (!obj)
-    return new Response("Not found", { status: 404, headers: cors(env) });
+    return new Response("Not found", { status: 404, headers: cors(request, env) });
   return new Response(obj.body, {
     headers: {
       "Content-Type": row.content_type || "image/jpeg",
       "Cache-Control": "private, max-age=300",
-      ...cors(env),
+      ...cors(request, env),
     },
   });
 }
@@ -518,9 +543,9 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (request.method === "OPTIONS")
-      return new Response(null, { headers: cors(env) });
+      return new Response(null, { headers: cors(request, env) });
     try {
-      if (url.pathname === "/api/health") return json({ ok: true }, 200, env);
+      if (url.pathname === "/api/health") return json({ ok: true }, 200, request, env);
       if (url.pathname === "/api/photo-check" && request.method === "POST")
         return photoCheck(request, env);
       if (url.pathname === "/api/leads" && request.method === "POST")
@@ -536,10 +561,10 @@ export default {
         return deleteLead(request, decodeURIComponent(detail[1]), env);
       if (url.pathname.startsWith("/api/photo/") && request.method === "GET")
         return servePhoto(request, url.pathname.split("/").pop(), env);
-      return json({ error: "not found" }, 404, env);
+      return json({ error: "not found" }, 404, request, env);
     } catch (e) {
       console.error(e);
-      return json({ error: "server_error" }, 500, env);
+      return json({ error: "server_error" }, 500, request, env);
     }
   },
 };
