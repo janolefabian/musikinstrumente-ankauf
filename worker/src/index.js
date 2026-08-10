@@ -526,10 +526,16 @@ async function servePhoto(request, photoId, env) {
     .bind(photoId)
     .first();
   if (!row)
-    return new Response("Not found", { status: 404, headers: cors(request, env) });
+    return new Response("Not found", {
+      status: 404,
+      headers: cors(request, env),
+    });
   const obj = await env.PHOTOS.get(row.object_key);
   if (!obj)
-    return new Response("Not found", { status: 404, headers: cors(request, env) });
+    return new Response("Not found", {
+      status: 404,
+      headers: cors(request, env),
+    });
   return new Response(obj.body, {
     headers: {
       "Content-Type": row.content_type || "image/jpeg",
@@ -545,7 +551,8 @@ export default {
     if (request.method === "OPTIONS")
       return new Response(null, { headers: cors(request, env) });
     try {
-      if (url.pathname === "/api/health") return json({ ok: true }, 200, request, env);
+      if (url.pathname === "/api/health")
+        return json({ ok: true }, 200, request, env);
       if (url.pathname === "/api/photo-check" && request.method === "POST")
         return photoCheck(request, env);
       if (url.pathname === "/api/leads" && request.method === "POST")
