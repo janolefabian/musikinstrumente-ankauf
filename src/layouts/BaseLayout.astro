@@ -5,7 +5,8 @@ import { site } from '../config/site';
 const {
   title = site.name,
   description = 'Musikinstrumente unkompliziert anbieten. Fotos senden, Anfrage persönlich prüfen lassen.',
-  canonical
+  canonical,
+  robots
 } = Astro.props;
 const canonicalUrl = canonical ? new URL(canonical, Astro.site) : Astro.url;
 ---
@@ -16,6 +17,7 @@ const canonicalUrl = canonical ? new URL(canonical, Astro.site) : Astro.url;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content={description} />
     <link rel="canonical" href={canonicalUrl} />
+    {robots ? <meta name="robots" content={robots} /> : null}
     <link rel="icon" href="/favicon.ico" />
     <title>{title}</title>
   </head>

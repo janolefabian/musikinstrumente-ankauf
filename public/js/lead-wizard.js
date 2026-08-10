@@ -8,25 +8,33 @@
   const params = new URLSearchParams(location.search);
 
   const TYPES = [
-    ["double_bass", "Kontrabass", "Geführte Fotos mit Qualitätscheck"],
-    ["bow", "Bogen", "Geigen-, Bratschen-, Cello- oder Kontrabassbogen"],
+    [
+      "double_bass",
+      "Kontrabass",
+      "Einzelinstrumente, Sammlungen und Instrumente aus Nachlässen",
+    ],
+    ["bow", "Bogen", "Für Geige, Bratsche, Cello oder Kontrabass"],
     [
       "strings",
       "Geige / Bratsche / Cello",
-      "Geführte Fotos mit Qualitätscheck",
+      "Einzelinstrumente jeder Herkunft und Bauart",
     ],
-    ["guitar", "Gitarre", "Einfacher Upload ohne KI-Führung"],
+    ["guitar", "Gitarre", "Akustische Gitarren, E-Gitarren und Zubehör"],
     [
       "estate",
       "Mehrere Instrumente / Nachlass",
-      "Erst Überblick, dann wichtige Details",
+      "Wenn Sie mehrere Instrumente oder einen gesamten Nachlass anbieten möchten",
     ],
     [
       "unknown",
       "Ich weiß es nicht",
-      "Ein Foto reicht für die erste Einordnung",
+      "Kein Problem – wir helfen bei der Einordnung",
     ],
-    ["other", "Etwas anderes", "Einfacher Upload ohne KI-Führung"],
+    [
+      "other",
+      "Anderes Instrument oder Zubehör",
+      "Weitere Instrumente oder musikalisches Zubehör",
+    ],
   ];
 
   const FLOWS = {
