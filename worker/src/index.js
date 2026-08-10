@@ -1,11 +1,34 @@
 import { PHOTO_PROMPT, LEAD_PROMPT } from "./prompt.js";
 
-function cors(env) {
-  return {
-    "Access-Control-Allow-Origin": env.ALLOWED_ORIGIN || "*",
+function cors(request, env) {
+  const origin = request?.headers?.get("Origin") || "";
+
+  const allowedOrigins = new Set([
+    "http://localhost:4321",
+    "http://localhost:4322",
+    "https://janolefabian.github.io",
+    "https://musikinstrument-ankauf.de",
+    "https://www.musikinstrument-ankauf.de",
+  ]);
+
+  // Optional additional origins from Wrangler config:
+  // "https://example.com,https://another.example.com"
+  for (const value of (env.ALLOWED_ORIGINS || "").split(",")) {
+    const trimmed = value.trim();
+    if (trimmed) allowedOrigins.add(trimmed);
+  }
+
+  const headers = {
     "Access-Control-Allow-Methods": "GET,POST,PATCH,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type,Authorization",
+    Vary: "Origin",
   };
+
+  if (allowedOrigins.has(origin)) {
+    headers["Access-Control-Allow-Origin"] = origin;
+  }
+
+  return headers;
 }
 function json(data, status = 200, env = {}) {
   return new Response(JSON.stringify(data), {
