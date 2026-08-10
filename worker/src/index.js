@@ -30,12 +30,12 @@ function cors(request, env) {
 
   return headers;
 }
-function json(data, status = 200, env = {}) {
+function json(data, status = 200, request, env = {}) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       "content-type": "application/json; charset=utf-8",
-      ...cors(env),
+      ...cors(request, env),
     },
   });
 }
