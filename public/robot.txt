@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://musikinstrument-ankauf.de/sitemap-index.xml
