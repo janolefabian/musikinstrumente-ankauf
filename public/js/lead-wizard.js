@@ -278,6 +278,12 @@
     file.onchange = async () => {
       const selected = file.files?.[0];
       if (!selected) return;
+      if (selected.size > 20 * 1024 * 1024) {
+        const quality = stage.querySelector("[data-quality]");
+        quality.innerHTML =
+          '<div class="quality retry">Das Bild ist ungewöhnlich groß. Bitte wählen Sie nach Möglichkeit eine normale Fotoaufnahme.</div>';
+        return;
+      }
       await handlePhoto(selected, item);
     };
   }
@@ -291,6 +297,17 @@
     const ctx = canvas.getContext("2d");
     ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     return await new Promise((r) => canvas.toBlob(r, "image/jpeg", 0.72));
+  }
+
+  async function imageForStorage(file, max = 3000) {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    return await new Promise((r) => canvas.toBlob(r, "image/jpeg", 0.88));
   }
   async function localQuality(blob) {
     const bitmap = await createImageBitmap(blob);
@@ -349,8 +366,13 @@
       quality = stage.querySelector("[data-quality]");
     const url = URL.createObjectURL(selected);
     preview.innerHTML = `<img src="${url}" alt="Vorschau des aufgenommenen Fotos">`;
-    quality.innerHTML =
-      '<div class="quality checking">Foto wird kurz geprüft …</div>';
+
+    const bitmap = await createImageBitmap(selected);
+    const isSmallImage = Math.max(bitmap.width, bitmap.height) < 800;
+
+    quality.innerHTML = isSmallImage
+      ? '<div class="quality retry">Dieses Bild ist recht klein. Wenn möglich, fotografieren Sie das Instrument bitte noch einmal. Sie können das Bild aber trotzdem verwenden.</div>'
+      : '<div class="quality checking">Foto wird kurz geprüft …</div>';
     try {
       const small = await imageForCheck(selected);
       const local = await localQuality(small);
@@ -494,7 +516,9 @@
       );
       for (let i = 0; i < state.photos.length; i++) {
         const p = state.photos[i];
-        fd.append(`photo_${i}`, p.file, p.file.name);
+        const archive = await imageForStorage(p.file);
+        const archiveName = (p.file.name || `photo-${i + 1}.jpg`).replace(/\.[^.]+$/, ".jpg");
+        fd.append(`photo_${i}`, archive, archiveName);
         if (isAIType(state.classifiedType || state.type)) {
           const small = await imageForCheck(p.file, 1024);
           if (small) fd.append(`ai_${i}`, small, `ai-${i}.jpg`);
