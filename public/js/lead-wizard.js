@@ -158,6 +158,14 @@
     ],
   };
 
+  const HELP_EXAMPLES = {
+    front: "/images/photo-help/doublebass/kontrabass-gesamt.jpg",
+    back: "/images/photo-help/doublebass/kontrabass-back.jpg",
+    scroll: "/images/photo-help/doublebass/kontrabass-schnecke.jpg",
+    label: "/images/photo-help/doublebass/kontrabass-zettel.jpg",
+    accessories: "/images/photo-help/doublebass/kontrabass-f-loch.jpg",
+  };
+
   const state = {
     type: params.get("type") || null,
     city: params.get("city") || "",
@@ -229,8 +237,13 @@
   }
 
   function helpMarkup(item) {
+    const exampleSrc = HELP_EXAMPLES[item[0]];
+    const exampleImg = exampleSrc
+      ? `<img src="${exampleSrc}" alt="Foto-Beispiel für ${item[1]}" style="width:100%;height:auto;border-radius:6px;object-fit:cover;">`
+      : "<div class=\"help-placeholder\">Beispielbild</div>";
+
     return item[3]
-      ? `<button type="button" class="help-button" data-help>Beispiel ansehen</button><div class="help-box" data-help-box hidden><strong>Beispiel / Erklärung</strong><p>${item[3]}</p><div class="help-placeholder">Beispielbild</div></div>`
+      ? `<button type="button" class="help-button" data-help>Beispiel ansehen</button><div class="help-box" data-help-box hidden><strong>Beispiel / Erklärung</strong><p>${item[3]}</p>${exampleImg}</div>`
       : "";
   }
 
