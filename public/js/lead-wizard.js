@@ -240,7 +240,7 @@
     const exampleSrc = HELP_EXAMPLES[item[0]];
     const exampleImg = exampleSrc
       ? `<img src="${exampleSrc}" alt="Foto-Beispiel für ${item[1]}" style="width:100%;height:auto;border-radius:6px;object-fit:cover;">`
-      : "<div class=\"help-placeholder\">Beispielbild</div>";
+      : '<div class="help-placeholder">Beispielbild</div>';
 
     return item[3]
       ? `<button type="button" class="help-button" data-help>Beispiel ansehen</button><div class="help-box" data-help-box hidden><strong>Beispiel / Erklärung</strong><p>${item[3]}</p>${exampleImg}</div>`
@@ -530,7 +530,10 @@
       for (let i = 0; i < state.photos.length; i++) {
         const p = state.photos[i];
         const archive = await imageForStorage(p.file);
-        const archiveName = (p.file.name || `photo-${i + 1}.jpg`).replace(/\.[^.]+$/, ".jpg");
+        const archiveName = (p.file.name || `photo-${i + 1}.jpg`).replace(
+          /\.[^.]+$/,
+          ".jpg",
+        );
         fd.append(`photo_${i}`, archive, archiveName);
         if (isAIType(state.classifiedType || state.type)) {
           const small = await imageForCheck(p.file, 1024);
