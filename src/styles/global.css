@@ -24,6 +24,31 @@ body {
 a {
   color: inherit;
 }
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline: 3px solid rgba(12, 109, 114, 0.35);
+  outline-offset: 3px;
+}
+.skip-link {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 100;
+  padding: 10px 14px;
+  background: var(--ink);
+  color: #fff;
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  text-decoration: none;
+  transform: translateY(-160%);
+}
+.skip-link:focus {
+  transform: translateY(0);
+}
 button,
 input,
 textarea,
@@ -208,6 +233,24 @@ select {
   width: 100%;
   max-height: 520px;
   object-fit: cover;
+}
+.topic-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 24px;
+}
+.topic-links a {
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-family: Arial, sans-serif;
+  font-size: 13px;
+  text-decoration: none;
+}
+.topic-links a:hover {
+  border-color: var(--accent);
+  color: var(--accent-dark);
 }
 .testimonial-grid {
   display: grid;
@@ -626,6 +669,138 @@ select {
   font-weight: 400;
   margin-top: 44px;
 }
+.content-page > p,
+.content-page > ul {
+  max-width: 740px;
+}
+.content-page li + li {
+  margin-top: 8px;
+}
+.content-cta {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 24px;
+  align-items: center;
+  margin: 38px 0 48px;
+  padding: 26px 28px;
+  background: var(--accent-dark);
+  color: #fff;
+}
+.content-cta div {
+  display: grid;
+  gap: 3px;
+}
+.content-cta strong {
+  font-size: 18px;
+}
+.content-cta span {
+  color: #d6e8e7;
+}
+.content-cta .button {
+  margin: 0;
+  white-space: nowrap;
+}
+.check-list {
+  list-style: none;
+  padding-left: 0;
+}
+.check-list li {
+  position: relative;
+  padding-left: 30px;
+}
+.check-list li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: var(--accent);
+  font-family: Arial, sans-serif;
+  font-weight: 700;
+}
+.content-note {
+  margin: 36px 0;
+  padding: 24px 26px;
+  border-left: 4px solid var(--accent);
+  background: #eef4f3;
+}
+.content-note strong {
+  font-size: 18px;
+}
+.content-note p {
+  margin: 5px 0 0;
+}
+.process-list {
+  padding: 0;
+  list-style: none;
+  counter-reset: process;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.process-list li {
+  counter-increment: process;
+  min-height: 142px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+.process-list li::before {
+  content: counter(process, decimal-leading-zero);
+  display: block;
+  margin-bottom: 14px;
+  color: var(--accent);
+  font-family: Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+.process-list strong,
+.process-list span {
+  display: block;
+}
+.process-list span {
+  margin-top: 4px;
+  color: var(--muted);
+}
+.faq-section {
+  margin-top: 64px;
+}
+.faq-section details {
+  border-top: 1px solid var(--line);
+  padding: 17px 0;
+}
+.faq-section details:last-child {
+  border-bottom: 1px solid var(--line);
+}
+.faq-section summary {
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 700;
+}
+.faq-section details p {
+  max-width: 720px;
+  margin: 12px 0 0;
+  color: #4e4e4e;
+}
+.related-topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  margin-top: 58px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+}
+.related-topics strong {
+  flex-basis: 100%;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.related-topics a {
+  color: var(--accent-dark);
+}
 .site-footer {
   padding: 40px clamp(20px, 5vw, 72px);
   border-top: 1px solid var(--line);
@@ -641,13 +816,19 @@ select {
 }
 .site-footer nav {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 16px;
 }
 .site-footer a {
   text-decoration: none;
 }
+.footer-navs {
+  gap: 10px;
+}
 @media (max-width: 800px) {
-  .site-header nav a:first-child {
+  .site-header nav a:first-child,
+  .site-header .nav-topic {
     display: none;
   }
   .site-header nav {
@@ -680,6 +861,20 @@ select {
   }
   .site-footer {
     flex-direction: column;
+  }
+  .site-footer nav {
+    justify-content: flex-start;
+  }
+  .content-cta,
+  .process-list {
+    grid-template-columns: 1fr;
+  }
+  .content-cta {
+    align-items: start;
+  }
+  .content-cta .button {
+    justify-self: start;
+    white-space: normal;
   }
   .review-header {
     align-items: start;

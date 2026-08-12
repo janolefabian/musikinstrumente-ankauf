@@ -9,6 +9,24 @@ const {
   robots
 } = Astro.props;
 const canonicalUrl = canonical ? new URL(canonical, Astro.site) : Astro.url;
+const organization = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  name: site.name,
+  url: site.url,
+  email: site.email,
+  address: {
+    '@type': 'PostalAddress',
+    streetAddress: site.address.street,
+    postalCode: site.address.postalCode,
+    addressLocality: site.address.city,
+    addressCountry: site.address.country
+  },
+  areaServed: {
+    '@type': 'Country',
+    name: 'Deutschland'
+  }
+};
 ---
 <!doctype html>
 <html lang="de">
@@ -18,27 +36,47 @@ const canonicalUrl = canonical ? new URL(canonical, Astro.site) : Astro.url;
     <meta name="description" content={description} />
     <link rel="canonical" href={canonicalUrl} />
     {robots ? <meta name="robots" content={robots} /> : null}
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="de_DE" />
+    <meta property="og:site_name" content={site.name} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <script type="application/ld+json" set:html={JSON.stringify(organization)}></script>
     <link rel="icon" href="/favicon.ico" />
     <title>{title}</title>
   </head>
   <body>
+    <a class="skip-link" href="#main-content">Zum Inhalt springen</a>
     <header class="site-header">
       <a class="brand" href="/">Musikinstrument <span>Ankauf</span></a>
       <nav aria-label="Hauptnavigation">
         <a href="/#so-funktionierts">So funktioniert es</a>
+        <a class="nav-topic" href="/kontrabass-verkaufen/">Kontrabass</a>
+        <a class="nav-topic" href="/instrument-geerbt/">Nachlass</a>
         <a href="/instrument-verkaufen/" class="nav-cta">Instrument anbieten</a>
       </nav>
     </header>
-    <main><slot /></main>
+    <main id="main-content"><slot /></main>
     <footer class="site-footer">
-      <div>
+      <div class="footer-brand">
         <strong>Musikinstrument Ankauf</strong>
         <span>Deutschlandweiter Ankauf und persönliche Prüfung von Instrumentenanfragen.</span>
       </div>
-      <nav>
-        <a href="/impressum/">Impressum</a>
-        <a href="/datenschutz/">Datenschutz</a>
-      </nav>
+      <div class="footer-navs">
+        <nav aria-label="Fachseiten">
+          <a href="/kontrabass-verkaufen/">Kontrabass verkaufen</a>
+          <a href="/kontrabassbogen-verkaufen/">Kontrabassbogen verkaufen</a>
+          <a href="/instrument-geerbt/">Instrument geerbt</a>
+        </nav>
+        <nav aria-label="Rechtliches">
+          <a href="/impressum/">Impressum</a>
+          <a href="/datenschutz/">Datenschutz</a>
+        </nav>
+      </div>
     </footer>
   </body>
 </html>
