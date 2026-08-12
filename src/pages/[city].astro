@@ -7,11 +7,13 @@ export function getStaticPaths() {
   return cities.map((city) => ({ params: { city: city.slug }, props: { city } }));
 }
 const { city } = Astro.props;
+const isIndexable = city.slug === 'berlin';
 ---
 <BaseLayout
   title={`Musikinstrumente Ankauf ${city.name} – Instrument verkaufen`}
   description={`Musikinstrument in ${city.name} verkaufen. Fotos senden, Anfrage unkompliziert und persönlich prüfen lassen.`}
   canonical={`/${city.slug}/`}
+  robots={isIndexable ? undefined : 'noindex,follow'}
 >
   <HomeContent cityName={city.name} />
 </BaseLayout>
