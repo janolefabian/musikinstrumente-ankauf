@@ -827,8 +827,7 @@ select {
   gap: 10px;
 }
 @media (max-width: 800px) {
-  .site-header nav a:first-child,
-  .site-header .nav-topic {
+  .site-header nav a:first-child {
     display: none;
   }
   .site-header nav {
