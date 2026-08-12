@@ -159,10 +159,10 @@
   };
 
   const HELP_EXAMPLES = {
-    front: "/images/photo-help/doublebass/kontrabass-gesamt.jpg",
-    back: "/images/photo-help/doublebass/kontrabass-back.jpg",
-    scroll: "/images/photo-help/doublebass/kontrabass-schnecke.jpg",
-    label: "/images/photo-help/doublebass/kontrabass-zettel.jpg",
+    front: "/images/photo-help/doublebass/kontrabass-gesamt.webp",
+    back: "/images/photo-help/doublebass/kontrabass-back.webp",
+    scroll: "/images/photo-help/doublebass/kontrabass-schnecke.webp",
+    label: "/images/photo-help/doublebass/kontrabass-zettel.webp",
   };
 
   const state = {
@@ -251,14 +251,14 @@
   function helpMarkup(item) {
     const exampleSrc = HELP_EXAMPLES[item[0]];
     const exampleImg = exampleSrc
-      ? `<img src="${exampleSrc}" alt="Foto-Beispiel für ${item[1]}" style="width:100%;height:auto;border-radius:6px;object-fit:cover;">`
+      ? `<div class="help-example"><img data-help-image data-src="${exampleSrc}" alt="Foto-Beispiel für ${item[1]}" width="600" height="900" decoding="async"></div>`
       : '';
 
     if (item[0] === "accessories") {
       return `<div class="help-box"><strong>Weitere Fotos</strong><p>Sie können hier zusätzliche, aussagekräftige Aufnahmen hochladen, z. B. Details, Ergänzungen oder Zubehör.</p></div>`;
     }
     if (!item[3]) return "";
-    return `<button type="button" class="help-button" data-help>Beispiel ansehen</button><div class="help-box" data-help-box hidden><strong>Beispiel / Erklärung</strong><p>${item[3]}</p>${exampleImg}</div>`;
+    return `<button type="button" class="help-button" data-help aria-expanded="false">Beispiel ansehen</button><div class="help-box" data-help-box hidden><strong>Beispiel / Erklärung</strong><p>${item[3]}</p>${exampleImg}</div>`;
   }
 
   function photoScreen() {
@@ -316,7 +316,13 @@
     if (help) {
       const helpBox = stage.querySelector("[data-help-box]");
       help.onclick = () => {
-        helpBox.hidden = !helpBox.hidden;
+        const isOpening = helpBox.hidden;
+        helpBox.hidden = !isOpening;
+        help.setAttribute("aria-expanded", String(isOpening));
+        if (isOpening) {
+          const image = helpBox.querySelector("[data-help-image]");
+          if (image && !image.hasAttribute("src")) image.src = image.dataset.src;
+        }
       };
     }
     const cameraFile = stage.querySelector("[data-camera-file]");

@@ -5,6 +5,14 @@ const { cityName } = Astro.props;
 const local = Boolean(cityName);
 ---
 <section class="hero">
+  <picture class="hero-media" aria-hidden="true">
+    <source
+      type="image/webp"
+      srcset="/images/header_instrumente-640.webp 640w, /images/header_instrumente-1024.webp 1024w, /images/header_instrumente-1600.webp 1600w"
+      sizes="100vw"
+    />
+    <img src="/images/header_instrumente-1600.webp" alt="" width="1600" height="1067" fetchpriority="high" />
+  </picture>
   <div class="hero-overlay"></div>
   <div class="hero-content">
     <p class="eyebrow hero-eyebrow">{local ? `Ankauf in ${cityName}` : 'Musikinstrument Ankauf'}</p>
@@ -62,7 +70,7 @@ const local = Boolean(cityName);
         <a href="/instrument-geerbt/">Instrument oder Sammlung geerbt</a>
       </div>
     </div>
-    <img src="/images/violine.jpg" alt="Detail eines Streichinstruments" loading="lazy" />
+    <img src="/images/violine-960.webp" alt="Detail eines Streichinstruments" width="960" height="640" loading="lazy" decoding="async" />
   </div>
 </section>
 

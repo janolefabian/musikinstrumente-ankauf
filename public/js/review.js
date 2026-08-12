@@ -14,7 +14,7 @@
   const bulkDeleteEl = root.querySelector("[data-bulk-delete]");
   const lightbox = root.querySelector("[data-lightbox]");
   const api = root.dataset.apiBase || "";
-  const fallbackImage = "/images/header_instrumente.jpg";
+  const fallbackImage = "/images/header_instrumente-640.webp";
 
   const demo = [
     {
@@ -27,7 +27,7 @@
         "Nachlass eines Berufsmusikers · mehrere Bögen · Stempel auf einem Bogen sichtbar",
       score: 96,
       confidence: 63,
-      thumbnail: "/images/header_instrumente.jpg",
+      thumbnail: "/images/header_instrumente-640.webp",
       name: "Anna Beispiel",
       maker: "unbekannt",
       status: "archived",
@@ -43,7 +43,7 @@
       summary: "Serieninstrument · wenige Auffälligkeiten",
       score: 9,
       confidence: 95,
-      thumbnail: "/images/violine.jpg",
+      thumbnail: "/images/violine-960.webp",
       name: "Max Beispiel",
       maker: "Yamaha",
       status: "new",
@@ -60,7 +60,7 @@
         "Bogenart unsicher · eingeprägter Stempel sichtbar · manuell prüfen",
       score: 67,
       confidence: 31,
-      thumbnail: "/images/testimonials/rol.jpg",
+      thumbnail: "/images/testimonials/rol-180.webp",
       name: "Lisa Beispiel",
       maker: "unbekannt",
       status: "new",
