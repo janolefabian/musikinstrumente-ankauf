@@ -27,7 +27,7 @@ Ohne `PUBLIC_API_BASE` arbeitet der Funnel im Demo-Modus. Für R2/D1/OpenAI/Make
 - Kontrabass, Bogen, Geige/Bratsche/Cello, Nachlass und „Ich weiß es nicht“ → geführte Fotoaufnahme + KI nur dort, wo sie nützlich ist.
 - Gitarre und sonstige Kategorien → normaler Upload **ohne KI**.
 - Qualitätscheck verwendet eine verkleinerte Bildkopie; das Original bleibt in R2.
-- „Weiter mit den bisherigen Fotos“ erscheint erst, nachdem mindestens zwei Fotos erfolgreich aufgenommen wurden.
+- Bei geführten Kategorien wird der Lead nach dem ersten brauchbaren Übersichtsfoto und den Kontaktdaten gespeichert. Weitere Detailfotos und Angaben können anschließend freiwillig ergänzt werden.
 - Keine Anfrage wird automatisch verworfen. A/B/C steuert nur Priorität und Benachrichtigung.
 
 ## Interne Review-Ansicht
@@ -65,12 +65,15 @@ npx wrangler d1 execute LEADS --remote --file=./schema/schema.sql
 
 ```bash
 npx wrangler secret put OPENAI_API_KEY
+npx wrangler secret put UPLOAD_TOKEN_SECRET
 npx wrangler secret put REVIEW_TOKEN
 npx wrangler secret put MAKE_WEBHOOK_URL
 ```
 
 5. `ALLOWED_ORIGIN` und `REVIEW_BASE_URL` in Produktion auf `https://musikinstrument-ankauf.de` setzen.
 6. Worker deployen und URL als `PUBLIC_API_BASE` beim Astro-Build setzen.
+
+`UPLOAD_TOKEN_SECRET` signiert den auf 72 Stunden begrenzten Fortsetzungszugang für ergänzende Fotos. Wenn kein eigener Wert gesetzt ist, nutzt der Worker als kompatible Übergangslösung `OPENAI_API_KEY`.
 
 Der Worker nutzt standardmäßig `gpt-5.6-luna` für die kostensensitive Bildprüfung und Triage. Das Modell kann über `OPENAI_MODEL` geändert werden.
 

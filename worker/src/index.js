@@ -60,6 +60,128 @@ function json(data, status = 200, request = null, env = null) {
 function id(prefix = "ANK") {
   return `${prefix}-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`;
 }
+
+function continuationSecret(env) {
+  return env.UPLOAD_TOKEN_SECRET || env.OPENAI_API_KEY || "";
+}
+
+function base64Url(bytes) {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000)
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function fromBase64Url(value) {
+  const padded = value.replace(/-/g, "+").replace(/_/g, "/").padEnd(
+    Math.ceil(value.length / 4) * 4,
+    "=",
+  );
+  const binary = atob(padded);
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+}
+
+async function continuationKey(env, usages) {
+  const secret = continuationSecret(env);
+  if (!secret) return null;
+  return crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    usages,
+  );
+}
+
+async function createContinuationToken(env, leadId) {
+  const key = await continuationKey(env, ["sign"]);
+  if (!key) return null;
+  const expires = Date.now() + 72 * 60 * 60 * 1000;
+  const nonce = crypto.randomUUID().replace(/-/g, "");
+  const payload = `${leadId}.${expires}.${nonce}`;
+  const signature = new Uint8Array(
+    await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload)),
+  );
+  return `${expires}.${nonce}.${base64Url(signature)}`;
+}
+
+async function validContinuationToken(env, leadId, token) {
+  const [expiresRaw, nonce, signatureRaw, ...rest] = String(token || "").split(
+    ".",
+  );
+  const expires = Number(expiresRaw);
+  if (
+    rest.length ||
+    !expiresRaw ||
+    !nonce ||
+    !signatureRaw ||
+    !Number.isFinite(expires) ||
+    expires < Date.now()
+  )
+    return false;
+  const key = await continuationKey(env, ["verify"]);
+  if (!key) return false;
+  try {
+    return await crypto.subtle.verify(
+      "HMAC",
+      key,
+      fromBase64Url(signatureRaw),
+      new TextEncoder().encode(`${leadId}.${expiresRaw}.${nonce}`),
+    );
+  } catch {
+    return false;
+  }
+}
+
+function sortedFiles(formData, prefix) {
+  return [...formData.entries()]
+    .filter(([key, value]) => key.startsWith(prefix) && value instanceof File)
+    .sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }));
+}
+
+async function storePhotos(env, leadId, files, photoMeta, created) {
+  const stored = [];
+  for (let i = 0; i < files.length; i++) {
+    const [, file] = files[i];
+    if (!file.type.startsWith("image/") || file.size > 20 * 1024 * 1024)
+      throw new Error("invalid_photo");
+    const pid = id("P");
+    const safeName = (file.name || "photo.jpg").replace(
+      /[^a-zA-Z0-9._-]/g,
+      "_",
+    );
+    const key = `${leadId}/${pid}-${safeName}`;
+    await env.PHOTOS.put(key, file.stream(), {
+      httpMetadata: { contentType: file.type || "application/octet-stream" },
+    });
+    stored.push({
+      id: pid,
+      key,
+      kind: photoMeta[i]?.kind || "",
+      label: photoMeta[i]?.label || "",
+      type: file.type || "image/jpeg",
+    });
+  }
+  return stored;
+}
+
+async function insertPhotoRows(env, leadId, photos, created) {
+  for (const photo of photos)
+    await env.LEADS.prepare(
+      `INSERT INTO photos (id,lead_id,object_key,kind,label,content_type,created_at) VALUES (?,?,?,?,?,?,?)`,
+    )
+      .bind(
+        photo.id,
+        leadId,
+        photo.key,
+        photo.kind,
+        photo.label,
+        photo.type,
+        created,
+      )
+      .run();
+}
+
 function extractText(response) {
   return (
     response.output_text ||
@@ -319,34 +441,11 @@ async function createLead(request, env, ctx) {
   const created = new Date().toISOString();
   const photoMeta = meta.photoMeta || [];
   const small = [];
-  const stored = [];
-  const files = [...fd.entries()]
-    .filter(([k, v]) => k.startsWith("photo_") && v instanceof File)
-    .sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }));
-  const aiFiles = [...fd.entries()]
-    .filter(([k, v]) => k.startsWith("ai_") && v instanceof File)
-    .sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }));
+  const files = sortedFiles(fd, "photo_");
+  const aiFiles = sortedFiles(fd, "ai_");
   for (const [, file] of aiFiles.slice(0, 8))
     small.push(await blobDataUrl(file));
-  for (let i = 0; i < files.length; i++) {
-    const [, file] = files[i];
-    const pid = id("P");
-    const safeName = (file.name || "photo.jpg").replace(
-      /[^a-zA-Z0-9._-]/g,
-      "_",
-    );
-    const key = `${leadId}/${pid}-${safeName}`;
-    await env.PHOTOS.put(key, file.stream(), {
-      httpMetadata: { contentType: file.type || "application/octet-stream" },
-    });
-    stored.push({
-      id: pid,
-      key,
-      kind: photoMeta[i]?.kind || "",
-      label: photoMeta[i]?.label || "",
-      type: file.type || "image/jpeg",
-    });
-  }
+  const stored = await storePhotos(env, leadId, files, photoMeta, created);
   const ai = await analyzeLead(env, meta, small);
   await env.LEADS.prepare(
     `INSERT INTO leads (id,created_at,type,classified_type,name,email,phone,city,story,maker,lead_class,interest_score,confidence,notable,summary,ai_json,photo_count,make_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
@@ -372,23 +471,135 @@ async function createLead(request, env, ctx) {
       env.MAKE_WEBHOOK_URL ? "pending" : "disabled",
     )
     .run();
-  for (const p of stored)
-    await env.LEADS.prepare(
-      `INSERT INTO photos (id,lead_id,object_key,kind,label,content_type,created_at) VALUES (?,?,?,?,?,?,?)`,
-    )
-      .bind(p.id, leadId, p.key, p.kind, p.label, p.type, created)
-      .run();
+  await insertPhotoRows(env, leadId, stored, created);
   const payload = makePayload(env, leadId, created, meta, ai, stored.length);
   if (ctx?.waitUntil) ctx.waitUntil(notifyMake(env, payload));
   else await notifyMake(env, payload);
+  const continuationToken = await createContinuationToken(env, leadId);
   return json(
     {
       id: leadId,
       class: ai.lead_class,
       notable: ai.notable,
       review_url: payload.review_url,
+      continuation_token: continuationToken,
     },
     201,
+    request,
+    env,
+  );
+}
+
+async function continueLead(request, leadId, env) {
+  const auth = request.headers.get("Authorization") || "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  if (!(await validContinuationToken(env, leadId, token)))
+    return json({ error: "unauthorized" }, 401, request, env);
+
+  const lead = await env.LEADS.prepare(`SELECT * FROM leads WHERE id=?`)
+    .bind(leadId)
+    .first();
+  if (!lead) return json({ error: "not_found" }, 404, request, env);
+
+  const fd = await request.formData();
+  const meta = JSON.parse(fd.get("meta") || "{}");
+  const photoMeta = Array.isArray(meta.photoMeta) ? meta.photoMeta : [];
+  const files = sortedFiles(fd, "photo_");
+  const aiFiles = sortedFiles(fd, "ai_");
+  const currentPhotoCount = Number(lead.photo_count || 0);
+  if (files.length > 8 || currentPhotoCount + files.length > 12)
+    return json({ error: "too_many_photos" }, 400, request, env);
+
+  const allowedTypes = new Set([
+    "double_bass",
+    "bow",
+    "strings",
+    "guitar",
+    "estate",
+    "unknown",
+    "other",
+  ]);
+  const classifiedType = allowedTypes.has(meta.classifiedType)
+    ? meta.classifiedType
+    : lead.classified_type || "";
+  const story = String(meta.data?.story ?? lead.story ?? "").slice(0, 10000);
+  const maker = String(meta.data?.maker ?? lead.maker ?? "").slice(0, 1000);
+  const created = new Date().toISOString();
+  const stored = await storePhotos(env, leadId, files, photoMeta, created);
+  await insertPhotoRows(env, leadId, stored, created);
+
+  let previousAnalysis = {};
+  try {
+    previousAnalysis = JSON.parse(lead.ai_json || "{}");
+  } catch {}
+  const analysisMeta = {
+    type: lead.type || "",
+    classifiedType,
+    data: {
+      name: lead.name || "",
+      email: lead.email || "",
+      phone: lead.phone || "",
+      city: lead.city || "",
+      story,
+      maker,
+    },
+    previousAnalysis,
+  };
+  const small = [];
+  for (const [, file] of aiFiles.slice(0, 8))
+    small.push(await blobDataUrl(file));
+  const photoCount = currentPhotoCount + stored.length;
+  let ai = previousAnalysis;
+  const analysisChanged =
+    small.length > 0 ||
+    story !== (lead.story || "") ||
+    maker !== (lead.maker || "") ||
+    classifiedType !== (lead.classified_type || "");
+  if (analysisChanged) {
+    try {
+      ai = await analyzeLead(env, analysisMeta, small);
+    } catch (error) {
+      console.error("Lead continuation analysis failed", error);
+    }
+  }
+  if (!ai || !ai.lead_class) {
+    ai = {
+      lead_class: lead.lead_class || "C",
+      interest_score: Number(lead.interest_score || 0),
+      confidence: Number(lead.confidence || 0),
+      notable: Boolean(lead.notable),
+      summary: lead.summary || "",
+      title: effectiveType(analysisMeta),
+      signals: [],
+    };
+  }
+  await env.LEADS.prepare(
+    `UPDATE leads SET classified_type=?,story=?,maker=?,lead_class=?,interest_score=?,confidence=?,notable=?,summary=?,ai_json=?,photo_count=? WHERE id=?`,
+  )
+    .bind(
+      classifiedType,
+      story,
+      maker,
+      ai.lead_class,
+      ai.interest_score,
+      ai.confidence,
+      ai.notable ? 1 : 0,
+      ai.summary,
+      JSON.stringify(ai),
+      photoCount,
+      leadId,
+    )
+    .run();
+
+  return json(
+    {
+      ok: true,
+      id: leadId,
+      photo_count: photoCount,
+      class: ai.lead_class,
+      notable: ai.notable,
+    },
+    200,
     request,
     env,
   );
@@ -557,6 +768,13 @@ export default {
         return photoCheck(request, env);
       if (url.pathname === "/api/leads" && request.method === "POST")
         return createLead(request, env, ctx);
+      const continuation = url.pathname.match(/^\/api\/leads\/([^/]+)\/continue$/);
+      if (continuation && request.method === "POST")
+        return continueLead(
+          request,
+          decodeURIComponent(continuation[1]),
+          env,
+        );
       if (url.pathname === "/api/review" && request.method === "GET")
         return reviewList(request, env);
       const detail = url.pathname.match(/^\/api\/review\/([^/]+)$/);

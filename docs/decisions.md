@@ -10,5 +10,5 @@
 - Gitarre und sonstige Kategorien: normales Formular und Foto-Upload ohne KI-Aufrufe.
 - Keine Anfrage wird automatisch verworfen. A = sofort; B = zeitnah; C = Weekly Review; `notable` markiert auffällige/unsichere Fälle.
 - Unwissen des Verkäufers ist niemals negativ. Nachlass, mehrere Instrumente/Bögen, Musiker-Vorbesitzer, Stempel/Etiketten und Unsicherheit können positiv sein.
-- Nutzer können den Fotoablauf jederzeit vorzeitig verlassen und mit den bereits vorhandenen Fotos absenden.
+- Bei geführten Kategorien wird die Anfrage bereits nach dem ersten brauchbaren Übersichtsfoto und den Kontaktdaten gespeichert. Weitere Detailfotos und Angaben sind anschließend freiwillig und werden über einen kurzlebigen, an die Anfrage gebundenen Fortsetzungszugang ergänzt.
 - Fotoanweisungen verwenden Alltagssprache. Fachbegriffe werden erklärt; optionaler Hilfe-Button und später echte Beispielbilder.
