@@ -1221,7 +1221,7 @@ Nicht weiter kosmetisch optimieren, bis echte Daten zeigen, was tatsächlich ben
 
 # 34. SEHR WICHTIG: Dashboard-Sicherheit
 
-## BEKANNTER PROBLEMPUNKT
+## AKTUELLER STAND
 
 Aktuelle Authentifizierung basiert auf `REVIEW_TOKEN`.
 
@@ -1229,15 +1229,10 @@ Aktuelle Authentifizierung basiert auf `REVIEW_TOKEN`.
 
 Der Worker prüft Bearer-Token.
 
-ABER:
-
-In einer vorhandenen Worker-Version gilt sinngemäß:
-
-`!env.REVIEW_TOKEN || auth === ...`
-
-Das bedeutet:
-
-Wenn kein `REVIEW_TOKEN` im Worker gesetzt ist, sind Review-Endpunkte möglicherweise offen.
+Der Worker arbeitet seit der Dashboard-Performance-Überarbeitung fail-closed.
+Wenn `REVIEW_TOKEN` fehlt, antworten Review- und Foto-Endpunkte mit
+`review_not_configured` und HTTP 503. Ein fehlendes Secret öffnet die Daten
+nicht mehr versehentlich.
 
 ---
 
@@ -1253,51 +1248,28 @@ Langfristig ist Cloudflare Access als echtes Login interessant.
 
 ---
 
-# 35. Bekannte Performance-Probleme des Dashboards
+# 35. Dashboard-Performance
 
-## FAKTEN
+## UMGESETZT AM 12. AUGUST 2026
 
-Mit nur ca. 9 Test-Leads wurden Ladezeiten von ca. 5–10 Sekunden beobachtet.
+- Eine D1-Abfrage liefert Leads, Vorschaureferenz, Zähler und Cursor statt N+1.
+- Die API lädt höchstens 30 Leads pro Seite und filtert/sucht serverseitig.
+- Zeilen und Text erscheinen sofort mit Platzhaltern.
+- Sichtbare Vorschaubilder laden lazy mit maximal vier parallelen Abrufen.
+- Neue Uploads speichern zusätzlich 480-Pixel-Thumbnails in R2.
+- Die Detailansicht lädt ebenfalls nur Thumbnails; Originale erst im Lightbox-Klick.
+- Prioritäts- und Bearbeitungsansichten sind getrennt; archivierte Leads liegen
+  in einer eigenen Ansicht und erscheinen nicht mehr unter „Alle“.
+- Mehrfachauswahl unterstützt gemeinsames Archivieren und Löschen (maximal 100
+  IDs je Anfrage).
+- Der Zugangsschlüssel wird über eine Dashboard-interne Anmeldemaske statt über
+  ein natives Browser-Popup eingegeben.
+- Bestehende Fotos können mit `worker/scripts/backfill-thumbnails.mjs`
+  einmalig nachgerüstet werden.
 
-Das ist nicht akzeptabel.
-
----
-
-## BEKANNTE URSACHE 1 – N+1 in D1
-
-Die Review-Liste lädt zunächst Leads.
-
-Danach wird aktuell für jeden Lead separat das erste Foto abgefragt.
-
-Damit entstehen:
-
-1 Hauptabfrage
-
-- N Fotoabfragen.
-
-Bei 200 Leads skaliert das schlecht.
-
----
-
-## BEKANNTE URSACHE 2 – Bilder seriell
-
-`review.js` lädt Vorschaubilder in einer Schleife mit `await`.
-
-Dadurch werden die Bilder nacheinander statt parallel/lazy geladen.
-
----
-
-## HOHE PRIORITÄT – ZIEL
-
-Review-Liste optimieren auf:
-
-- eine SQL-Abfrage / JOIN für Leads + Preview-Foto
-- Pagination oder Cursor
-- z. B. 25–30 Leads initial
-- Lazy Loading / Parallelisierung der Thumbnails
-- große Fotos erst in Detailansicht laden
-
-Dashboard darf nicht 300 Leads inklusive aller Bilder beim Start abrufen.
+Vor dem produktiven Worker-Deploy muss
+`worker/schema/migrations/0002_photo_thumbnails_and_review_indexes.sql` auf
+die Remote-D1-Datenbank angewendet werden. Danach den Backfill ausführen.
 
 ---
 
@@ -1735,25 +1707,16 @@ Der Nutzer muss nicht wissen, welche Kategorien KI verwenden.
 
 ## PRIORITÄT 1 – Sicherheit
 
-Review-API überprüfen.
-
-Sicherstellen, dass produktiv ein `REVIEW_TOKEN` gesetzt ist.
+Sicherstellen, dass produktiv ein starkes `REVIEW_TOKEN` gesetzt bleibt.
 
 Danach langfristige Auth-Lösung bewerten.
 
 ---
 
-## PRIORITÄT 2 – Dashboard Performance
+## PRIORITÄT 2 – Dashboard im Betrieb beobachten
 
-N+1-D1-Abfragen beseitigen.
-
-Pagination.
-
-Lazy/parallel Thumbnail Loading.
-
-Ziel:
-
-Dashboard auch mit Hunderten oder Tausenden Leads schnell.
+Die strukturellen Performance-Probleme sind behoben. Nach dem produktiven
+Thumbnail-Backfill reale Ladezeiten und den Umgang mit 50+ Leads beobachten.
 
 ---
 

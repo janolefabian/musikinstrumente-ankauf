@@ -16,17 +16,46 @@ const apiBase = import.meta.env.PUBLIC_API_BASE || '';
       </div>
     </header>
 
-    <div class="review-tabs" role="tablist" aria-label="Anfragen filtern">
-      <button data-filter="urgent">Sofort <span data-count="urgent"></span></button>
-      <button data-filter="notable">Auffällig <span data-count="notable"></span></button>
-      <button data-filter="week">Diese Woche <span data-count="week"></span></button>
-      <button data-filter="c">C-Leads <span data-count="c"></span></button>
-      <button data-filter="all" class="active">Alle <span data-count="all"></span></button>
+    <div class="review-filter-groups">
+      <div class="review-filter-group">
+        <span class="review-filter-label">Priorität</span>
+        <div class="review-tabs" role="tablist" aria-label="Nach Priorität filtern">
+          <button data-filter="urgent">Sofort <span data-count="urgent"></span></button>
+          <button data-filter="notable">Auffällig <span data-count="notable"></span></button>
+          <button data-filter="week">Diese Woche <span data-count="week"></span></button>
+          <button data-filter="c">C-Leads <span data-count="c"></span></button>
+          <button data-filter="all" class="active">Alle <span data-count="all"></span></button>
+        </div>
+      </div>
+      <div class="review-filter-group">
+        <span class="review-filter-label">Bearbeitung</span>
+        <div class="review-tabs" role="tablist" aria-label="Nach Bearbeitungsstatus filtern">
+          <button data-filter="new">Neu <span data-count="new"></span></button>
+          <button data-filter="interesting">Interessant <span data-count="interesting"></span></button>
+          <button data-filter="contacted">Kontaktiert <span data-count="contacted"></span></button>
+          <button data-filter="purchased">Angekauft <span data-count="purchased"></span></button>
+          <button data-filter="declined">Nicht interessant <span data-count="declined"></span></button>
+          <button data-filter="archived">Archiviert <span data-count="archived"></span></button>
+        </div>
+      </div>
     </div>
 
     <div class="review-workspace">
       <aside class="review-list-pane" aria-label="Anfrageliste">
+        <div class="review-bulk-bar" data-bulk-bar>
+          <label class="review-select-all">
+            <input type="checkbox" data-select-page aria-label="Alle sichtbaren Anfragen auswählen" />
+            <span data-selection-count>Auswählen</span>
+          </label>
+          <div class="review-bulk-actions">
+            <button type="button" data-bulk-archive disabled>Archivieren</button>
+            <button class="danger-action" type="button" data-bulk-delete disabled>Löschen</button>
+          </div>
+        </div>
         <div class="review-list" data-review-grid></div>
+        <div class="review-load-more">
+          <button class="ghost-button" type="button" data-load-more hidden>Weitere Anfragen laden</button>
+        </div>
       </aside>
       <main class="review-detail-pane" data-review-detail>
         <div class="review-empty-state">

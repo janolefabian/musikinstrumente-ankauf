@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS photos (
   id TEXT PRIMARY KEY,
   lead_id TEXT NOT NULL,
   object_key TEXT NOT NULL,
+  thumbnail_key TEXT,
   kind TEXT,
   label TEXT,
   content_type TEXT,
@@ -34,4 +35,4 @@ CREATE TABLE IF NOT EXISTS photos (
 CREATE INDEX IF NOT EXISTS idx_leads_created ON leads(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_leads_class ON leads(lead_class, notable, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_photos_lead ON photos(lead_id);
+CREATE INDEX IF NOT EXISTS idx_photos_lead_created ON photos(lead_id, created_at, id);

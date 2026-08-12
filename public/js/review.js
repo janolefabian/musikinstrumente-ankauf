@@ -6,8 +6,15 @@
   const detailEl = root.querySelector("[data-review-detail]");
   const searchEl = root.querySelector("[data-review-search]");
   const resultCountEl = root.querySelector("[data-result-count]");
+  const loadMoreEl = root.querySelector("[data-load-more]");
+  const bulkBarEl = root.querySelector("[data-bulk-bar]");
+  const selectPageEl = root.querySelector("[data-select-page]");
+  const selectionCountEl = root.querySelector("[data-selection-count]");
+  const bulkArchiveEl = root.querySelector("[data-bulk-archive]");
+  const bulkDeleteEl = root.querySelector("[data-bulk-delete]");
   const lightbox = root.querySelector("[data-lightbox]");
   const api = root.dataset.apiBase || "";
+  const fallbackImage = "/images/header_instrumente.jpg";
 
   const demo = [
     {
@@ -20,10 +27,10 @@
         "Nachlass eines Berufsmusikers · mehrere Bögen · Stempel auf einem Bogen sichtbar",
       score: 96,
       confidence: 63,
-      image: "/images/header_instrumente.jpg",
+      thumbnail: "/images/header_instrumente.jpg",
       name: "Anna Beispiel",
       maker: "unbekannt",
-      status: "new",
+      status: "archived",
       created_at: new Date().toISOString(),
       photo_count: 7,
     },
@@ -36,7 +43,7 @@
       summary: "Serieninstrument · wenige Auffälligkeiten",
       score: 9,
       confidence: 95,
-      image: "/images/violine.jpg",
+      thumbnail: "/images/violine.jpg",
       name: "Max Beispiel",
       maker: "Yamaha",
       status: "new",
@@ -53,7 +60,7 @@
         "Bogenart unsicher · eingeprägter Stempel sichtbar · manuell prüfen",
       score: 67,
       confidence: 31,
-      image: "/images/testimonials/rol.jpg",
+      thumbnail: "/images/testimonials/rol.jpg",
       name: "Lisa Beispiel",
       maker: "unbekannt",
       status: "new",
@@ -69,7 +76,27 @@
   let selectedId = null;
   let currentImages = [];
   let lightboxIndex = 0;
+  let lightboxRequest = 0;
+  let nextCursor = null;
+  let hasMore = false;
+  let filteredTotal = 0;
+  let loadingPage = false;
+  let requestSequence = 0;
+  let detailSequence = 0;
+  let searchTimer = 0;
   const imageCache = new Map();
+  const objectUrls = new Set();
+  const imageQueue = [];
+  const selectedLeadIds = new Set();
+  let activeImageLoads = 0;
+  const statusFilters = new Set([
+    "new",
+    "interesting",
+    "contacted",
+    "purchased",
+    "declined",
+    "archived",
+  ]);
 
   const esc = (s) =>
     String(s ?? "").replace(
@@ -101,196 +128,488 @@
       interesting: "Interessant",
       purchased: "Angekauft",
       declined: "Nicht interessant",
-      archived: "Archiv",
+      archived: "Archiviert",
     })[status] ||
     status ||
     "Neu";
 
-  function bucket(l) {
-    if (l.class === "A") return "urgent";
-    if (l.notable) return "notable";
-    if (l.class === "B") return "week";
-    if (l.class === "C") return "c";
+  function bucket(lead) {
+    if (lead.status === "archived") return "archived";
+    if (lead.class === "A") return "urgent";
+    if (lead.notable) return "notable";
+    if (lead.class === "B") return "week";
+    if (lead.class === "C") return "c";
     return "all";
   }
 
-  function searchable(l) {
+  function searchable(lead) {
     return norm(
       [
-        l.id,
-        l.title,
-        l.city,
-        l.summary,
-        l.name,
-        l.maker,
-        l.email,
-        l.phone,
-        l.type,
-        l.classified_type,
+        lead.id,
+        lead.title,
+        lead.city,
+        lead.summary,
+        lead.name,
+        lead.maker,
+        lead.email,
+        lead.phone,
+        lead.type,
+        lead.classified_type,
       ].join(" "),
     );
   }
 
-  function filteredLeads() {
-    return leads.filter((l) => {
-      const filterOk = currentFilter === "all" || bucket(l) === currentFilter;
-      const queryOk = !currentQuery || searchable(l).includes(currentQuery);
-      return filterOk && queryOk;
-    });
+  function matchesFilter(lead, filter = currentFilter) {
+    const status = lead.status || "new";
+    if (statusFilters.has(filter)) return status === filter;
+    if (status === "archived") return false;
+    return filter === "all" || bucket(lead) === filter;
   }
 
-  function updateCounts() {
-    const counts = { urgent: 0, notable: 0, week: 0, c: 0, all: leads.length };
-    for (const l of leads) {
-      const b = bucket(l);
-      if (counts[b] !== undefined) counts[b]++;
+  function demoLeads() {
+    return demo.filter(
+      (lead) =>
+        matchesFilter(lead) &&
+        (!currentQuery || searchable(lead).includes(norm(currentQuery))),
+    );
+  }
+
+  function countsFor(items) {
+    const counts = {
+      urgent: 0,
+      notable: 0,
+      week: 0,
+      c: 0,
+      all: 0,
+      new: 0,
+      interesting: 0,
+      contacted: 0,
+      purchased: 0,
+      declined: 0,
+      archived: 0,
+    };
+    for (const lead of items) {
+      const name = bucket(lead);
+      if (name === "archived") counts.archived += 1;
+      else {
+        counts.all += 1;
+        if (counts[name] !== undefined) counts[name] += 1;
+        const status = lead.status || "new";
+        if (counts[status] !== undefined) counts[status] += 1;
+      }
     }
-    root.querySelectorAll("[data-count]").forEach((el) => {
-      const n = counts[el.dataset.count] ?? 0;
-      el.textContent = n ? `(${n})` : "";
+    return counts;
+  }
+
+  function updateCounts(counts) {
+    root.querySelectorAll("[data-count]").forEach((element) => {
+      const count = Number(counts?.[element.dataset.count] || 0);
+      element.textContent = count ? `(${count})` : "";
     });
   }
 
-  async function apiFetch(url, options = {}, allowPrompt = true) {
+  function syncSelectionUI() {
+    const loadedIds = leads.map((lead) => lead.id);
+    const selectedLoaded = loadedIds.filter((id) => selectedLeadIds.has(id));
+    const count = selectedLeadIds.size;
+    selectionCountEl.textContent = count
+      ? `${count} ausgewählt`
+      : "Auswählen";
+    selectPageEl.checked =
+      loadedIds.length > 0 && selectedLoaded.length === loadedIds.length;
+    selectPageEl.indeterminate =
+      selectedLoaded.length > 0 && selectedLoaded.length < loadedIds.length;
+    bulkArchiveEl.disabled = count === 0 || currentFilter === "archived";
+    bulkArchiveEl.hidden = currentFilter === "archived";
+    bulkDeleteEl.disabled = count === 0;
+    listEl.querySelectorAll("[data-lead-row]").forEach((row) => {
+      const selected = selectedLeadIds.has(row.dataset.leadRow);
+      row.classList.toggle("bulk-selected", selected);
+      const checkbox = row.querySelector("[data-select-lead]");
+      if (checkbox) checkbox.checked = selected;
+    });
+  }
+
+  function clearSelection() {
+    selectedLeadIds.clear();
+    syncSelectionUI();
+  }
+
+  async function apiFetch(url, options = {}) {
     const headers = new Headers(options.headers || {});
     if (token) headers.set("Authorization", `Bearer ${token}`);
-    let r = await fetch(url, { ...options, headers });
-    if (r.status === 401 && allowPrompt) {
-      const entered = prompt("Review-Zugangsschlüssel:") || "";
-      if (!entered) return r;
-      token = entered;
-      localStorage.setItem("review-token", token);
-      headers.set("Authorization", `Bearer ${token}`);
-      r = await fetch(url, { ...options, headers });
-    }
-    return r;
+    return fetch(url, { ...options, headers });
   }
 
-  async function protectedImage(url) {
-    if (!api || !url) return url || "/images/header_instrumente.jpg";
+  function renderAuthGate(invalid = false) {
+    unobserveImages(listEl);
+    leads = [];
+    filteredTotal = 0;
+    hasMore = false;
+    selectedLeadIds.clear();
+    resultCountEl.textContent = "Geschützt";
+    bulkBarEl.hidden = true;
+    loadMoreEl.hidden = true;
+    listEl.innerHTML = `
+      <div class="review-auth-state">
+        <p class="eyebrow">Interner Bereich</p>
+        <h2>Dashboard entsperren</h2>
+        <p>Geben Sie den Review-Zugangsschlüssel ein. Er wird nur für dieses interne Dashboard verwendet.</p>
+        <form data-review-login>
+          <label for="review-access-token">Zugangsschlüssel</label>
+          <input id="review-access-token" type="password" autocomplete="current-password" required data-review-token>
+          <button type="submit">Dashboard öffnen</button>
+          <p class="review-auth-error" data-auth-error>${invalid ? "Der Zugangsschlüssel ist nicht korrekt. Bitte versuchen Sie es erneut." : ""}</p>
+        </form>
+      </div>`;
+    syncSelectionUI();
+    const form = listEl.querySelector("[data-review-login]");
+    const input = listEl.querySelector("[data-review-token]");
+    form.onsubmit = async (event) => {
+      event.preventDefault();
+      const entered = input.value.trim();
+      if (!entered) return;
+      token = entered;
+      localStorage.setItem("review-token", token);
+      await loadLeads({ reset: true });
+    };
+    input.focus();
+  }
+
+  function runImageQueue() {
+    while (activeImageLoads < 4 && imageQueue.length) {
+      const job = imageQueue.shift();
+      activeImageLoads += 1;
+      job
+        .task()
+        .then(job.resolve, job.reject)
+        .finally(() => {
+          activeImageLoads -= 1;
+          runImageQueue();
+        });
+    }
+  }
+
+  function queuedImage(task) {
+    return new Promise((resolve, reject) => {
+      imageQueue.push({ task, resolve, reject });
+      runImageQueue();
+    });
+  }
+
+  function protectedImage(url) {
+    if (!url) return Promise.resolve(fallbackImage);
+    if (!api) return Promise.resolve(url);
     if (imageCache.has(url)) return imageCache.get(url);
-    const r = await apiFetch(url);
-    if (!r.ok) return "/images/header_instrumente.jpg";
-    const objectUrl = URL.createObjectURL(await r.blob());
-    imageCache.set(url, objectUrl);
-    return objectUrl;
+    const promise = apiFetch(url)
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Bild ${response.status}`);
+        const objectUrl = URL.createObjectURL(await response.blob());
+        objectUrls.add(objectUrl);
+        return objectUrl;
+      })
+      .catch((error) => {
+        imageCache.delete(url);
+        console.error(error);
+        return fallbackImage;
+      });
+    imageCache.set(url, promise);
+    return promise;
+  }
+
+  async function loadImage(element) {
+    if (element.dataset.loading === "true" || element.dataset.loaded === "true")
+      return;
+    element.dataset.loading = "true";
+    const source = await queuedImage(() =>
+      element.isConnected
+        ? protectedImage(element.dataset.protectedImage)
+        : Promise.resolve(null),
+    );
+    if (!element.isConnected || !source) return;
+    element.onload = () => {
+      element.dataset.loaded = "true";
+      element.closest(".protected-image-shell")?.classList.remove("is-loading");
+    };
+    element.src = source;
+  }
+
+  const imageObserver = "IntersectionObserver" in window
+    ? new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (!entry.isIntersecting) continue;
+            imageObserver.unobserve(entry.target);
+            loadImage(entry.target);
+          }
+        },
+        { rootMargin: "180px" },
+      )
+    : null;
+
+  function observeImages(scope) {
+    scope.querySelectorAll("img[data-protected-image]").forEach((image) => {
+      if (imageObserver) imageObserver.observe(image);
+      else loadImage(image);
+    });
+  }
+
+  function unobserveImages(scope) {
+    if (!imageObserver) return;
+    scope.querySelectorAll("img[data-protected-image]").forEach((image) => {
+      imageObserver.unobserve(image);
+    });
   }
 
   function setUrlLead(id, replace = false) {
-    const u = new URL(location.href);
-    if (id) u.searchParams.set("lead", id);
-    else u.searchParams.delete("lead");
-    history[replace ? "replaceState" : "pushState"]({}, "", u);
+    const url = new URL(location.href);
+    if (id) url.searchParams.set("lead", id);
+    else url.searchParams.delete("lead");
+    history[replace ? "replaceState" : "pushState"]({}, "", url);
   }
 
   function confidenceBadge(confidence) {
-    const n = Number(confidence);
-    return Number.isFinite(n) && n < 50
+    const number = Number(confidence);
+    return Number.isFinite(number) && number < 50
       ? '<span class="badge uncertain">KI unsicher</span>'
       : "";
   }
 
-  async function renderList() {
-    const show = filteredLeads();
-    resultCountEl.textContent = `${show.length} ${show.length === 1 ? "Anfrage" : "Anfragen"}`;
-    const cards = [];
-    for (const l of show) {
-      const img = await protectedImage(l.image);
-      cards.push(`
-        <button class="lead-row${l.id === selectedId ? " selected" : ""}" data-open="${esc(l.id)}" type="button">
-          <img src="${esc(img || "/images/header_instrumente.jpg")}" alt="Vorschaubild der Anfrage">
-          <div class="lead-row-body">
-            <div class="lead-row-top">
-              <div class="lead-badges">
-                <span class="badge ${l.class === "A" ? "hot" : ""}">${esc(l.class || "?")}</span>
-                ${l.notable ? '<span class="badge notable">Auffällig</span>' : ""}
-                ${confidenceBadge(l.confidence)}
-              </div>
-              <time>${esc(fmtDate(l.created_at))}</time>
+  function renderSkeletons() {
+    bulkBarEl.hidden = false;
+    unobserveImages(listEl);
+    listEl.innerHTML = Array.from(
+      { length: 6 },
+      () => `
+        <div class="lead-row lead-row-skeleton" aria-hidden="true">
+          <span class="lead-select-placeholder"></span>
+          <div class="lead-row-open">
+            <span class="lead-thumb protected-image-shell is-loading"></span>
+            <div class="lead-row-body">
+              <span class="skeleton-line short"></span>
+              <span class="skeleton-line title"></span>
+              <span class="skeleton-line"></span>
+              <span class="skeleton-line medium"></span>
             </div>
-            <h3>${esc(l.title || "Anfrage")}</h3>
-            <p class="lead-meta">${esc(l.city || "Ort unbekannt")}${l.name ? ` · ${esc(l.name)}` : ""}</p>
-            <p class="lead-row-summary">${esc(l.summary || "")}</p>
-            <div class="lead-row-footer"><span>${esc(statusLabel(l.status))}</span><span>${esc(l.photo_count ?? "")}${l.photo_count != null ? " Fotos" : ""}</span><span>Interesse ${esc(l.score ?? "?")}</span></div>
           </div>
-        </button>`);
-    }
-    listEl.innerHTML =
-      cards.join("") ||
-      '<div class="review-no-results"><p>Keine Anfragen in dieser Ansicht.</p></div>';
-    listEl
-      .querySelectorAll("[data-open]")
-      .forEach((b) => (b.onclick = () => openLead(b.dataset.open)));
+        </div>`,
+    ).join("");
+    resultCountEl.textContent = "Wird geladen …";
+    loadMoreEl.hidden = true;
   }
 
-  async function renderDemoDetail(id) {
-    const l = leads.find((x) => x.id === id) || leads[0];
-    if (!l) return;
-    detailEl.innerHTML = `<div class="review-empty-state"><p class="eyebrow">Demo</p><h2>${esc(l.title)}</h2><p>Mit verbundenem Worker erscheinen hier alle Bilder, Angaben und KI-Signale.</p></div>`;
+  function renderList() {
+    bulkBarEl.hidden = false;
+    resultCountEl.textContent = `${filteredTotal} ${filteredTotal === 1 ? "Anfrage" : "Anfragen"}`;
+    unobserveImages(listEl);
+    listEl.innerHTML =
+      leads
+        .map((lead) => {
+          const thumbnail = lead.thumbnail || lead.image || fallbackImage;
+          return `
+            <div class="lead-row${lead.id === selectedId ? " selected" : ""}${selectedLeadIds.has(lead.id) ? " bulk-selected" : ""}" data-lead-row="${esc(lead.id)}">
+              <label class="lead-select" title="Anfrage auswählen">
+                <input type="checkbox" data-select-lead value="${esc(lead.id)}" aria-label="${esc(lead.title || "Anfrage")} auswählen" ${selectedLeadIds.has(lead.id) ? "checked" : ""}>
+              </label>
+              <button class="lead-row-open" data-open="${esc(lead.id)}" type="button">
+                <span class="lead-thumb protected-image-shell is-loading">
+                  <img data-protected-image="${esc(thumbnail)}" alt="Vorschaubild der Anfrage" width="92" height="92">
+                </span>
+                <div class="lead-row-body">
+                  <div class="lead-row-top">
+                    <div class="lead-badges">
+                      <span class="badge ${lead.class === "A" ? "hot" : ""}">${esc(lead.class || "?")}</span>
+                      ${lead.notable ? '<span class="badge notable">Auffällig</span>' : ""}
+                      ${confidenceBadge(lead.confidence)}
+                    </div>
+                    <time>${esc(fmtDate(lead.created_at))}</time>
+                  </div>
+                  <h3>${esc(lead.title || "Anfrage")}</h3>
+                  <p class="lead-meta">${esc(lead.city || "Ort unbekannt")}${lead.name ? ` · ${esc(lead.name)}` : ""}</p>
+                  <p class="lead-row-summary">${esc(lead.summary || "")}</p>
+                  <div class="lead-row-footer"><span>${esc(statusLabel(lead.status))}</span><span>${esc(lead.photo_count ?? "")}${lead.photo_count != null ? " Fotos" : ""}</span><span>Interesse ${esc(lead.score ?? "?")}</span></div>
+                </div>
+              </button>
+            </div>`;
+        })
+        .join("") ||
+      '<div class="review-no-results"><p>Keine Anfragen in dieser Ansicht.</p></div>';
+    listEl.querySelectorAll("[data-open]").forEach((button) => {
+      button.onclick = () => openLead(button.dataset.open);
+    });
+    listEl.querySelectorAll("[data-select-lead]").forEach((checkbox) => {
+      checkbox.onchange = () => {
+        if (checkbox.checked) selectedLeadIds.add(checkbox.value);
+        else selectedLeadIds.delete(checkbox.value);
+        syncSelectionUI();
+      };
+    });
+    observeImages(listEl);
+    syncSelectionUI();
+    loadMoreEl.hidden = !hasMore;
+    loadMoreEl.disabled = loadingPage;
+    loadMoreEl.textContent = loadingPage
+      ? "Wird geladen …"
+      : "Weitere Anfragen laden";
+  }
+
+  async function loadLeads({ reset = false } = {}) {
+    if (!api) {
+      if (reset) selectedLeadIds.clear();
+      leads = demoLeads();
+      filteredTotal = leads.length;
+      hasMore = false;
+      updateCounts(countsFor(demo));
+      renderList();
+      return;
+    }
+    if (loadingPage && !reset) return;
+    const sequence = ++requestSequence;
+    loadingPage = true;
+    if (reset) {
+      selectedLeadIds.clear();
+      leads = [];
+      nextCursor = null;
+      hasMore = false;
+      renderSkeletons();
+    } else {
+      renderList();
+    }
+    const params = new URLSearchParams({
+      limit: "30",
+      filter: currentFilter,
+    });
+    if (currentQuery) params.set("q", currentQuery);
+    if (!reset && nextCursor) params.set("cursor", nextCursor);
+    try {
+      const response = await apiFetch(`${api}/api/review?${params}`);
+      if (!response.ok) {
+        const error = new Error(`HTTP ${response.status}`);
+        error.status = response.status;
+        throw error;
+      }
+      const payload = await response.json();
+      if (sequence !== requestSequence) return;
+      const items = Array.isArray(payload) ? payload : payload.items || [];
+      leads = reset ? items : [...leads, ...items];
+      filteredTotal = Array.isArray(payload)
+        ? leads.length
+        : Number(payload.filtered_total || 0);
+      hasMore = Array.isArray(payload) ? false : Boolean(payload.has_more);
+      nextCursor = Array.isArray(payload) ? null : payload.next_cursor || null;
+      updateCounts(
+        Array.isArray(payload) ? countsFor(leads) : payload.counts || {},
+      );
+      renderList();
+    } catch (error) {
+      if (sequence !== requestSequence) return;
+      console.error(error);
+      if (reset) {
+        if (error.status === 401) {
+          const invalid = Boolean(token);
+          token = "";
+          localStorage.removeItem("review-token");
+          renderAuthGate(invalid);
+          return;
+        }
+        const message =
+          error.status === 503
+              ? "Der Review-Zugang ist im Worker noch nicht eingerichtet."
+              : "Die Dashboard-API ist gerade nicht erreichbar. Bitte prüfen, ob der lokale Worker läuft.";
+        listEl.innerHTML =
+          `<div class="review-no-results"><p>${message}</p><button class="ghost-button" type="button" data-retry-dashboard>Erneut versuchen</button></div>`;
+        listEl.querySelector("[data-retry-dashboard]").onclick = () =>
+          loadLeads({ reset: true });
+      } else renderList();
+    } finally {
+      if (sequence === requestSequence) {
+        loadingPage = false;
+        loadMoreEl.disabled = false;
+        loadMoreEl.textContent = "Weitere Anfragen laden";
+      }
+    }
+  }
+
+  function renderDemoDetail(id) {
+    const lead = leads.find((item) => item.id === id) || demo[0];
+    if (!lead) return;
+    detailEl.innerHTML = `<div class="review-empty-state"><p class="eyebrow">Demo</p><h2>${esc(lead.title)}</h2><p>Mit verbundenem Worker erscheinen hier alle Bilder, Angaben und KI-Signale.</p></div>`;
+  }
+
+  function markSelectedRow() {
+    listEl.querySelectorAll("[data-lead-row]").forEach((row) => {
+      row.classList.toggle("selected", row.dataset.leadRow === selectedId);
+    });
   }
 
   async function openLead(id, options = {}) {
+    const sequence = ++detailSequence;
     selectedId = id;
+    markSelectedRow();
     if (!options.keepUrl) setUrlLead(id);
-    await renderList();
     root.classList.add("has-selection");
+    unobserveImages(detailEl);
     detailEl.innerHTML =
-      '<div class="detail-loading">Anfrage wird geladen …</div>';
+      '<div class="detail-loading"><span class="detail-loading-mark"></span>Anfrage wird geladen …</div>';
 
     if (!api) {
-      await renderDemoDetail(id);
+      renderDemoDetail(id);
       return;
     }
 
     try {
-      const r = await apiFetch(`${api}/api/review/${encodeURIComponent(id)}`);
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const l = await r.json();
-      currentImages = [];
-      for (const p of l.photos || [])
-        currentImages.push({ ...p, src: await protectedImage(p.url) });
-      const signals = l.ai?.signals || [];
-      const title = l.ai?.title || l.type || "Anfrage";
-      const confidence = Number(l.confidence);
+      const response = await apiFetch(
+        `${api}/api/review/${encodeURIComponent(id)}`,
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const lead = await response.json();
+      if (sequence !== detailSequence) return;
+      currentImages = (lead.photos || []).map((photo) => ({
+        ...photo,
+        thumbnail: photo.thumbnail_url || photo.url,
+      }));
+      const signals = lead.ai?.signals || [];
+      const title = lead.ai?.title || lead.type || "Anfrage";
+      const confidence = Number(lead.confidence);
 
       detailEl.innerHTML = `
         <div class="detail-top">
           <button class="ghost-button detail-mobile-back" data-close type="button">← Anfragen</button>
           <div class="lead-badges">
-            <span class="badge ${l.lead_class === "A" ? "hot" : ""}">${esc(l.lead_class || "?")}</span>
-            ${l.notable ? '<span class="badge notable">Auffällig</span>' : ""}
+            <span class="badge ${lead.lead_class === "A" ? "hot" : ""}">${esc(lead.lead_class || "?")}</span>
+            ${lead.notable ? '<span class="badge notable">Auffällig</span>' : ""}
             ${confidenceBadge(confidence)}
-            <span class="badge">Interesse ${esc(l.interest_score ?? "?")}</span>
-            <span class="badge">Sicherheit ${esc(l.confidence ?? "?")}</span>
-            <span class="badge status-badge">${esc(statusLabel(l.status))}</span>
+            <span class="badge">Interesse ${esc(lead.interest_score ?? "?")}</span>
+            <span class="badge">Sicherheit ${esc(lead.confidence ?? "?")}</span>
+            <span class="badge status-badge">${esc(statusLabel(lead.status))}</span>
           </div>
         </div>
         <h2>${esc(title)}</h2>
-        <p class="lead-meta">${esc(l.city || "Ort unbekannt")} · ${esc(l.id)} · ${esc(fmtDate(l.created_at))}</p>
-        ${l.summary ? `<p class="detail-summary">${esc(l.summary)}</p>` : ""}
+        <p class="lead-meta">${esc(lead.city || "Ort unbekannt")} · ${esc(lead.id)} · ${esc(fmtDate(lead.created_at))}</p>
+        ${lead.summary ? `<p class="detail-summary">${esc(lead.summary)}</p>` : ""}
         ${Number.isFinite(confidence) && confidence < 50 ? '<div class="uncertainty-note"><strong>Manuell prüfen.</strong> Die automatische Einordnung ist hier unsicher.</div>' : ""}
 
         <div class="detail-gallery-header"><h3>Fotos</h3><span>${currentImages.length}</span></div>
         <div class="detail-grid">
-          ${currentImages.length ? currentImages.map((x, i) => `<button class="detail-photo" type="button" data-image-index="${i}"><img src="${esc(x.src)}" alt="${esc(x.label || "Foto")}"><span>${esc(x.label || x.kind || `Foto ${i + 1}`)}</span></button>`).join("") : "<p>Keine Fotos vorhanden.</p>"}
+          ${currentImages.length ? currentImages.map((photo, index) => `<button class="detail-photo" type="button" data-image-index="${index}"><span class="detail-image protected-image-shell is-loading"><img data-protected-image="${esc(photo.thumbnail)}" alt="${esc(photo.label || "Foto")}" width="480" height="360"></span><span>${esc(photo.label || photo.kind || `Foto ${index + 1}`)}</span></button>`).join("") : "<p>Keine Fotos vorhanden.</p>"}
         </div>
 
         <div class="detail-columns">
           <section>
             <h3>Kontakt & Angaben</h3>
             <dl>
-              <dt>Name</dt><dd>${esc(l.name || "–")}</dd>
-              <dt>E-Mail</dt><dd>${l.email ? `<a href="mailto:${encodeURIComponent(l.email)}">${esc(l.email)}</a>` : "–"}</dd>
-              <dt>Telefon</dt><dd>${l.phone ? `<a href="tel:${esc(l.phone.replace(/[^+0-9]/g, ""))}">${esc(l.phone)}</a>` : "–"}</dd>
-              <dt>Ort</dt><dd>${esc(l.city || "–")}</dd>
-              <dt>Hersteller / Name</dt><dd>${esc(l.maker || "–")}</dd>
-              <dt>Geschichte / Herkunft</dt><dd>${esc(l.story || "–")}</dd>
+              <dt>Name</dt><dd>${esc(lead.name || "–")}</dd>
+              <dt>E-Mail</dt><dd>${lead.email ? `<a href="mailto:${encodeURIComponent(lead.email)}">${esc(lead.email)}</a>` : "–"}</dd>
+              <dt>Telefon</dt><dd>${lead.phone ? `<a href="tel:${esc(lead.phone.replace(/[^+0-9]/g, ""))}">${esc(lead.phone)}</a>` : "–"}</dd>
+              <dt>Ort</dt><dd>${esc(lead.city || "–")}</dd>
+              <dt>Hersteller / Name</dt><dd>${esc(lead.maker || "–")}</dd>
+              <dt>Geschichte / Herkunft</dt><dd>${esc(lead.story || "–")}</dd>
             </dl>
           </section>
           <section>
             <h3>Auffälligkeiten</h3>
-            <ul>${signals.length ? signals.map((s) => `<li>${esc(s)}</li>`).join("") : "<li>Keine zusätzlichen Signale.</li>"}</ul>
-            <p class="mini-note">Make: ${esc(l.make_status || "–")}</p>
+            <ul>${signals.length ? signals.map((signal) => `<li>${esc(signal)}</li>`).join("") : "<li>Keine zusätzlichen Signale.</li>"}</ul>
+            <p class="mini-note">Make: ${esc(lead.make_status || "–")}</p>
           </section>
         </div>
 
@@ -301,151 +620,240 @@
             <button data-status="contacted" type="button">Kontaktiert</button>
             <button data-status="purchased" type="button">Angekauft</button>
             <button data-status="declined" type="button">Nicht interessant</button>
-            <button data-status="archived" type="button">Archiv</button>
+            <button data-status="archived" type="button">Archivieren</button>
+            <button class="danger-action" data-delete type="button">Löschen</button>
           </div>
           <div class="status-note" data-status-note></div>
-          <div style="margin-top:12px">
-            <button class="ghost-button" data-delete type="button">Lead löschen</button>
-          </div>
           <p class="keyboard-hint">Tastatur: <kbd>J</kbd>/<kbd>K</kbd> nächster/vorheriger Lead · <kbd>I</kbd> interessant · <kbd>C</kbd> kontaktiert · <kbd>P</kbd> angekauft</p>
         </div>`;
 
       detailEl.querySelector("[data-close]").onclick = closeMobileDetail;
-      detailEl
-        .querySelectorAll("[data-image-index]")
-        .forEach(
-          (b) => (b.onclick = () => openLightbox(Number(b.dataset.imageIndex))),
-        );
-      detailEl
-        .querySelectorAll("[data-status]")
-        .forEach((b) => (b.onclick = () => setStatus(id, b.dataset.status)));
-      const delBtn = detailEl.querySelector("[data-delete]");
-      if (delBtn) {
-        delBtn.onclick = async () => {
-          if (
-            !confirm(
-              "Lead endgültig löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
-            )
-          )
-            return;
-          if (!api) {
-            leads = leads.filter((x) => x.id !== id);
-            updateCounts();
-            closeMobileDetail();
-            return;
-          }
-          const rr = await apiFetch(
-            `${api}/api/review/${encodeURIComponent(id)}`,
-            { method: "DELETE" },
-          );
-          if (rr.ok) {
-            leads = leads.filter((x) => x.id !== id);
-            updateCounts();
-            closeMobileDetail();
-            await renderList();
-          } else {
-            alert("Löschen fehlgeschlagen.");
-          }
-        };
-      }
-    } catch (e) {
-      console.error(e);
+      detailEl.querySelectorAll("[data-image-index]").forEach((button) => {
+        button.onclick = () => openLightbox(Number(button.dataset.imageIndex));
+      });
+      detailEl.querySelectorAll("[data-status]").forEach((button) => {
+        button.onclick = () => setStatus(id, button.dataset.status);
+      });
+      detailEl.querySelector("[data-delete]").onclick = () => deleteLead(id);
+      observeImages(detailEl);
+    } catch (error) {
+      if (sequence !== detailSequence) return;
+      console.error(error);
       detailEl.innerHTML =
         '<div class="review-empty-state"><h2>Anfrage konnte nicht geladen werden.</h2><p>Bitte API-Verbindung und Review-Zugang prüfen.</p></div>';
     }
+  }
+
+  async function deleteLead(id) {
+    if (
+      !confirm(
+        "Lead endgültig löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+      )
+    )
+      return;
+    if (!api) {
+      const index = demo.findIndex((lead) => lead.id === id);
+      if (index >= 0) demo.splice(index, 1);
+      closeMobileDetail();
+      loadLeads({ reset: true });
+      return;
+    }
+    const response = await apiFetch(
+      `${api}/api/review/${encodeURIComponent(id)}`,
+      { method: "DELETE" },
+    );
+    if (!response.ok) {
+      alert("Löschen fehlgeschlagen.");
+      return;
+    }
+    closeMobileDetail();
+    await loadLeads({ reset: true });
   }
 
   async function setStatus(id, status) {
     if (!api) return;
     const note = detailEl.querySelector("[data-status-note]");
     if (note) note.textContent = "Wird gespeichert …";
-    const rr = await apiFetch(`${api}/api/review/${encodeURIComponent(id)}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-    if (rr.ok) {
-      const l = leads.find((x) => x.id === id);
-      if (l) l.status = status;
+    const response = await apiFetch(
+      `${api}/api/review/${encodeURIComponent(id)}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      },
+    );
+    if (response.ok) {
+      const lead = leads.find((item) => item.id === id);
+      if (lead) lead.status = status;
+      const rowStatus = listEl.querySelector(
+        `[data-open="${CSS.escape(id)}"] .lead-row-footer span`,
+      );
+      if (rowStatus) rowStatus.textContent = statusLabel(status);
       if (note) note.textContent = `Status: ${statusLabel(status)}`;
-      await renderList();
       const badge = detailEl.querySelector(".status-badge");
       if (badge) badge.textContent = statusLabel(status);
-    } else if (note)
+      if (lead && !matchesFilter(lead)) {
+        closeMobileDetail();
+        await loadLeads({ reset: true });
+      }
+    } else if (note) {
       note.textContent = "Status konnte nicht gespeichert werden.";
+    }
   }
 
-  function closeMobileDetail() {
+  async function runBulkAction(action) {
+    const ids = [...selectedLeadIds];
+    if (!ids.length) return;
+    if (
+      action === "delete" &&
+      !confirm(
+        `${ids.length} ${ids.length === 1 ? "Anfrage" : "Anfragen"} endgültig löschen? Diese Aktion kann nicht rückgängig gemacht werden.`,
+      )
+    )
+      return;
+
+    bulkArchiveEl.disabled = true;
+    bulkDeleteEl.disabled = true;
+    const actionButton = action === "archive" ? bulkArchiveEl : bulkDeleteEl;
+    const originalLabel = actionButton.textContent;
+    actionButton.textContent = "Wird ausgeführt …";
+    try {
+      if (!api) {
+        if (action === "archive") {
+          for (const lead of demo) {
+            if (selectedLeadIds.has(lead.id)) lead.status = "archived";
+          }
+        } else {
+          for (let index = demo.length - 1; index >= 0; index--) {
+            if (selectedLeadIds.has(demo[index].id)) demo.splice(index, 1);
+          }
+        }
+      } else {
+        const response = await apiFetch(`${api}/api/review/bulk`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids, action }),
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      }
+      if (selectedId && selectedLeadIds.has(selectedId)) closeMobileDetail();
+      await loadLeads({ reset: true });
+    } catch (error) {
+      console.error(error);
+      alert(
+        action === "archive"
+          ? "Die ausgewählten Anfragen konnten nicht archiviert werden."
+          : "Die ausgewählten Anfragen konnten nicht gelöscht werden.",
+      );
+      syncSelectionUI();
+    } finally {
+      actionButton.textContent = originalLabel;
+    }
+  }
+
+  function closeMobileDetail(options = {}) {
+    detailSequence += 1;
     root.classList.remove("has-selection");
     selectedId = null;
-    setUrlLead(null);
-    renderList();
+    markSelectedRow();
+    if (!options.keepUrl) setUrlLead(null);
+    unobserveImages(detailEl);
+    detailEl.innerHTML =
+      '<div class="review-empty-state"><p class="eyebrow">Auswahl</p><h2>Anfrage auswählen</h2><p>Links eine Anfrage öffnen. Mit <kbd>J</kbd> und <kbd>K</kbd> können Sie schnell durch die Liste gehen.</p></div>';
   }
 
-  function openLightbox(index) {
+  async function openLightbox(index) {
     if (!currentImages.length) return;
     lightboxIndex = Math.max(0, Math.min(index, currentImages.length - 1));
+    const requestId = ++lightboxRequest;
     const item = currentImages[lightboxIndex];
-    root.querySelector("[data-lightbox-image]").src = item.src;
+    const image = root.querySelector("[data-lightbox-image]");
+    image.removeAttribute("src");
+    lightbox.classList.add("is-loading");
     root.querySelector("[data-lightbox-caption]").textContent =
-      item.label || item.kind || `Foto ${lightboxIndex + 1}`;
+      `${item.label || item.kind || `Foto ${lightboxIndex + 1}`} · Original wird geladen …`;
     lightbox.hidden = false;
     lightbox.setAttribute("aria-hidden", "false");
     document.body.classList.add("lightbox-open");
+    const source = await protectedImage(item.url);
+    if (requestId !== lightboxRequest || lightbox.hidden) return;
+    image.onload = () => lightbox.classList.remove("is-loading");
+    image.src = source;
+    root.querySelector("[data-lightbox-caption]").textContent =
+      item.label || item.kind || `Foto ${lightboxIndex + 1}`;
   }
 
   function closeLightbox() {
+    lightboxRequest += 1;
     lightbox.hidden = true;
     lightbox.setAttribute("aria-hidden", "true");
+    lightbox.classList.remove("is-loading");
     document.body.classList.remove("lightbox-open");
   }
 
   function stepLightbox(delta) {
     if (lightbox.hidden || !currentImages.length) return;
-    lightboxIndex =
+    const index =
       (lightboxIndex + delta + currentImages.length) % currentImages.length;
-    openLightbox(lightboxIndex);
+    openLightbox(index);
   }
 
   function stepLead(delta) {
-    const visible = filteredLeads();
-    if (!visible.length) return;
-    let i = visible.findIndex((l) => l.id === selectedId);
-    if (i < 0) i = delta > 0 ? -1 : 0;
-    i = Math.max(0, Math.min(visible.length - 1, i + delta));
-    if (visible[i]) openLead(visible[i].id);
+    if (!leads.length) return;
+    let index = leads.findIndex((lead) => lead.id === selectedId);
+    if (index < 0) index = delta > 0 ? -1 : 0;
+    index = Math.max(0, Math.min(leads.length - 1, index + delta));
+    if (leads[index]) openLead(leads[index].id);
   }
 
   root.querySelector("[data-lightbox-close]").onclick = closeLightbox;
   root.querySelector("[data-lightbox-prev]").onclick = () => stepLightbox(-1);
   root.querySelector("[data-lightbox-next]").onclick = () => stepLightbox(1);
-  lightbox.onclick = (e) => {
-    if (e.target === lightbox) closeLightbox();
+  lightbox.onclick = (event) => {
+    if (event.target === lightbox) closeLightbox();
   };
+  loadMoreEl.onclick = () => loadLeads();
+  selectPageEl.onchange = () => {
+    if (selectPageEl.checked) {
+      for (const lead of leads) selectedLeadIds.add(lead.id);
+    } else {
+      clearSelection();
+      return;
+    }
+    syncSelectionUI();
+  };
+  bulkArchiveEl.onclick = () => runBulkAction("archive");
+  bulkDeleteEl.onclick = () => runBulkAction("delete");
 
-  root.querySelectorAll("[data-filter]").forEach(
-    (b) =>
-      (b.onclick = async () => {
-        currentFilter = b.dataset.filter;
-        root
-          .querySelectorAll("[data-filter]")
-          .forEach((x) => x.classList.toggle("active", x === b));
-        await renderList();
-      }),
-  );
+  root.querySelectorAll("[data-filter]").forEach((button) => {
+    button.onclick = () => {
+      currentFilter = button.dataset.filter;
+      root.querySelectorAll("[data-filter]").forEach((item) => {
+        item.classList.toggle("active", item === button);
+      });
+      loadLeads({ reset: true });
+    };
+  });
 
-  searchEl.addEventListener("input", async () => {
-    currentQuery = norm(searchEl.value);
-    await renderList();
+  searchEl.addEventListener("input", () => {
+    clearTimeout(searchTimer);
+    searchTimer = window.setTimeout(() => {
+      currentQuery = searchEl.value.trim();
+      loadLeads({ reset: true });
+    }, 280);
   });
 
   window.addEventListener("popstate", () => {
     const id = new URLSearchParams(location.search).get("lead");
     if (id) openLead(id, { keepUrl: true });
-    else closeMobileDetail();
+    else closeMobileDetail({ keepUrl: true });
   });
 
-  window.addEventListener("keydown", (e) => {
+  window.addEventListener("beforeunload", () => {
+    for (const url of objectUrls) URL.revokeObjectURL(url);
+  });
+
+  window.addEventListener("keydown", (event) => {
     const tag = document.activeElement?.tagName;
     if (
       ["INPUT", "TEXTAREA", "SELECT"].includes(tag) ||
@@ -453,36 +861,23 @@
     )
       return;
     if (!lightbox.hidden) {
-      if (e.key === "Escape") closeLightbox();
-      if (e.key === "ArrowLeft") stepLightbox(-1);
-      if (e.key === "ArrowRight") stepLightbox(1);
+      if (event.key === "Escape") closeLightbox();
+      if (event.key === "ArrowLeft") stepLightbox(-1);
+      if (event.key === "ArrowRight") stepLightbox(1);
       return;
     }
-    if (e.key.toLowerCase() === "j") stepLead(1);
-    if (e.key.toLowerCase() === "k") stepLead(-1);
+    if (event.key.toLowerCase() === "j") stepLead(1);
+    if (event.key.toLowerCase() === "k") stepLead(-1);
     if (!selectedId) return;
-    if (e.key.toLowerCase() === "i") setStatus(selectedId, "interesting");
-    if (e.key.toLowerCase() === "c") setStatus(selectedId, "contacted");
-    if (e.key.toLowerCase() === "p") setStatus(selectedId, "purchased");
+    if (event.key.toLowerCase() === "i")
+      setStatus(selectedId, "interesting");
+    if (event.key.toLowerCase() === "c") setStatus(selectedId, "contacted");
+    if (event.key.toLowerCase() === "p") setStatus(selectedId, "purchased");
   });
 
   (async () => {
-    try {
-      if (!api) leads = demo;
-      else {
-        const r = await apiFetch(`${api}/api/review`);
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        leads = await r.json();
-      }
-      updateCounts();
-      const id = new URLSearchParams(location.search).get("lead");
-      await renderList();
-      if (id && leads.some((l) => l.id === id))
-        await openLead(id, { keepUrl: true });
-    } catch (e) {
-      console.error(e);
-      listEl.innerHTML =
-        '<div class="review-no-results"><p>Dashboard konnte nicht geladen werden. Bitte Review-Zugangsschlüssel und API-Konfiguration prüfen.</p></div>';
-    }
+    const id = new URLSearchParams(location.search).get("lead");
+    await loadLeads({ reset: true });
+    if (id) await openLead(id, { keepUrl: true });
   })();
 })();
