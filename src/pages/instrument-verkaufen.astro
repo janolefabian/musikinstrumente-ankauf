@@ -2,11 +2,46 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import LeadWizard from '../components/LeadWizard.astro';
 ---
-<BaseLayout title="Instrument anbieten – Musikinstrument Ankauf" description="Instrument oder Bogen unkompliziert anbieten: wenige Angaben, geführte Fotos, persönliche Prüfung.">
+<BaseLayout title="Musikinstrument verkaufen – Anfrage mit Fotos" description="Musikinstrument oder Bogen unkompliziert verkaufen: wenige Angaben, geführte Fotos und eine persönliche Prüfung Ihrer Anfrage.">
   <section class="wizard-intro">
     <p class="eyebrow">Anfrage starten</p>
     <h1>Was möchten Sie anbieten?</h1>
     <p>Die nächsten Schritte passen sich an Ihr Instrument an. Wenn Sie etwas nicht wissen, können Sie es einfach überspringen.</p>
   </section>
   <LeadWizard />
+  <section class="wizard-information" aria-labelledby="instrument-info-title">
+    <p class="eyebrow">Musikinstrument verkaufen</p>
+    <h2 id="instrument-info-title">Einige gute Fotos reichen für den ersten Schritt.</h2>
+    <p class="section-lead">Sie müssen Hersteller, Alter oder Wert nicht selbst kennen. Wählen Sie die passendste Kategorie – oder einfach „Ich weiß es nicht“. Die Anfrage wird nach dem ersten brauchbaren Foto und Ihren Kontaktdaten zwischengespeichert.</p>
+
+    <div class="instrument-topic-grid">
+      <a href="/geige-verkaufen/"><strong>Geige verkaufen</strong><span>Welche Ansichten, Zettel und Details helfen.</span></a>
+      <a href="/cello-verkaufen/"><strong>Cello verkaufen</strong><span>Cello, Bogen und Schäden sicher dokumentieren.</span></a>
+      <a href="/bogen-verkaufen/"><strong>Bogen verkaufen</strong><span>Frosch, Kopf und mögliche Stempel zeigen.</span></a>
+      <a href="/kontrabass-verkaufen/"><strong>Kontrabass verkaufen</strong><span>Große Instrumente Schritt für Schritt fotografieren.</span></a>
+      <a href="/instrument-geerbt/"><strong>Instrument geerbt</strong><span>Bestand, Koffer und Unterlagen zusammenhalten.</span></a>
+    </div>
+
+    <aside class="content-note">
+      <strong>Keine Anfrage wird allein automatisch entschieden.</strong>
+      <p>Die digitale Führung hilft vor allem dabei, aussagekräftige Fotos zu erhalten. Die eingereichten Informationen werden anschließend persönlich angesehen.</p>
+    </aside>
+
+    <section class="faq-section" aria-labelledby="instrument-faq">
+      <p class="eyebrow">Häufige Fragen</p>
+      <h2 id="instrument-faq">Vor dem Start</h2>
+      <details>
+        <summary>Was mache ich, wenn ich das Instrument nicht bestimmen kann?</summary>
+        <p>Wählen Sie „Ich weiß es nicht“. Ein vollständiges Übersichtsbild ist für den Anfang wichtiger als eine genaue Bezeichnung.</p>
+      </details>
+      <details>
+        <summary>Muss das Instrument in gutem Zustand sein?</summary>
+        <p>Nein. Fotografieren Sie Schäden gut sichtbar und versuchen Sie nicht, das Instrument für die Anfrage selbst zu reparieren.</p>
+      </details>
+      <details>
+        <summary>Kann ich mehrere Instrumente gemeinsam zeigen?</summary>
+        <p>Ja. Wählen Sie „Mehrere Instrumente / Nachlass“ und beginnen Sie mit einer Übersicht über den gesamten Bestand.</p>
+      </details>
+    </section>
+  </section>
 </BaseLayout>
