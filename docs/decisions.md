@@ -1,7 +1,8 @@
 # Produktentscheidungen v1
 
-- Breite SEO-Positionierung als deutschlandweiter Musikinstrument-Ankauf; Berlin bleibt als echte lokale Seite indexierbar.
-- Weitere Stadtseiten bleiben für bestehende Links erreichbar, werden aber nicht indexiert oder in der Sitemap geführt, solange sie keinen belegbaren eigenen lokalen Mehrwert bieten.
+- Breite SEO-Positionierung als deutschlandweiter Musikinstrument-Ankauf; alle bestehenden Stadtseiten sind wieder indexierbar und in der Sitemap enthalten.
+- Stadtseiten dürfen keine Filiale oder Annahmestelle vortäuschen. Sie erklären transparent den deutschlandweiten Online-Erstkontakt und enthalten eigenständige regionale Hinweise, Foto-Hilfe, Ablauf, Fachlinks und FAQ statt einer Kopie der Startseite.
+- Neue Stadtseiten werden nicht automatisch in großer Zahl erzeugt. Sie kommen nur hinzu, wenn für die Region ehrlicher, hilfreicher und eigenständiger Inhalt gepflegt werden kann.
 - Der normale Markenauftritt nennt keine persönliche Person; rechtlich erforderliche Angaben gehören ins Impressum.
 - Testimonials der früher erfolgreichen Website bleiben erhalten.
 - Kernversprechen: schnell, einfach, persönlich geprüft. KI wird nicht als Verkaufsargument kommuniziert.

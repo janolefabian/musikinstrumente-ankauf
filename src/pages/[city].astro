@@ -1,19 +1,17 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import HomeContent from '../components/HomeContent.astro';
+import CityContent from '../components/CityContent.astro';
 import { cities } from '../data/cities';
 
 export function getStaticPaths() {
   return cities.map((city) => ({ params: { city: city.slug }, props: { city } }));
 }
 const { city } = Astro.props;
-const isIndexable = city.slug === 'berlin';
 ---
 <BaseLayout
-  title={`Musikinstrumente Ankauf ${city.name} – Instrument verkaufen`}
-  description={`Musikinstrument in ${city.name} verkaufen. Fotos senden, Anfrage unkompliziert und persönlich prüfen lassen.`}
+  title={`Instrument in ${city.name} verkaufen – Fotos senden`}
+  description={`Musikinstrument aus ${city.name} online anbieten: Fotos senden, Anfrage zwischenspeichern und persönlich prüfen lassen. Ohne Fachkenntnisse.`}
   canonical={`/${city.slug}/`}
-  robots={isIndexable ? undefined : 'noindex,follow'}
 >
-  <HomeContent cityName={city.name} />
+  <CityContent city={city} />
 </BaseLayout>

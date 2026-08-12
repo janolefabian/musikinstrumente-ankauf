@@ -1,10 +1,15 @@
+---
+import { cities } from '../data/cities';
+---
 <section class="section city-section" aria-labelledby="city-title">
   <div class="section-inner">
     <p class="eyebrow">In Ihrer Region</p>
-    <h2 id="city-title">Deutschlandweit erreichbar – mit Sitz in Berlin.</h2>
-    <p class="section-lead">Sie können Ihr Instrument unabhängig von Ihrem Wohnort unkompliziert online zeigen. Für Berlin finden Sie zusätzliche lokale Informationen.</p>
+    <h2 id="city-title">Deutschlandweit online erreichbar.</h2>
+    <p class="section-lead">Der erste Schritt findet per Foto statt. Die Regional-Seiten erklären, wie die Anfrage aus Ihrer Stadt abläuft; alles Weitere wird persönlich und passend zum Instrument abgestimmt.</p>
     <div class="city-links">
-      <a href="/berlin/">Musikinstrumente verkaufen in Berlin</a>
+      {cities.map((city) => (
+        <a href={`/${city.slug}/`}>Instrument verkaufen in {city.name}</a>
+      ))}
     </div>
   </div>
 </section>

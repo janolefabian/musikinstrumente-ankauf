@@ -1,0 +1,126 @@
+---
+const { city } = Astro.props;
+const offerUrl = `/instrument-verkaufen/?city=${encodeURIComponent(city.name)}`;
+---
+
+<article class="city-page">
+  <header class="city-page-hero">
+    <div class="city-page-hero-inner">
+      <div>
+        <p class="eyebrow">Deutschlandweiter Online-Ankauf · Region {city.name}</p>
+        <h1>Musikinstrument aus {city.name} verkaufen</h1>
+        <p class="city-page-lead">{city.intro}</p>
+        <div class="city-page-actions">
+          <a class="button city-primary" href={offerUrl}>Instrument aus {city.name} anbieten</a>
+          <a class="city-text-link" href="#ablauf">Erst den Ablauf ansehen</a>
+        </div>
+      </div>
+      <aside class="city-trust-card" aria-label="Das Wichtigste zur Anfrage">
+        <p class="eyebrow">Der sichere erste Schritt</p>
+        <strong>Das Instrument bleibt zunächst bei Ihnen.</strong>
+        <ul class="check-list">
+          <li>Fotos reichen zum Start</li>
+          <li>Keine Fachkenntnisse nötig</li>
+          <li>Persönliche Prüfung statt Sofort-Automatik</li>
+        </ul>
+        <p>Eine Übergabe oder Abholung wird – falls sinnvoll – erst nach der Foto-Prüfung individuell abgestimmt.</p>
+      </aside>
+    </div>
+  </header>
+
+  <section class="section city-process" id="ablauf" aria-labelledby="city-process-title">
+    <div class="section-inner narrow">
+      <p class="eyebrow">Anfrage aus {city.name}</p>
+      <h2 id="city-process-title">Erst zeigen, dann den nächsten Schritt entscheiden.</h2>
+      <p class="section-lead">Diese Seite beschreibt den deutschlandweiten Online-Service für {city.region}. Sie ist kein Hinweis auf eine separate Filiale oder Annahmestelle.</p>
+      <ol class="process-list">
+        <li><strong>Instrument auswählen</strong><span>Geige, Cello, Kontrabass, Bogen, Nachlass oder „Ich weiß es nicht“.</span></li>
+        <li><strong>Erstes Foto aufnehmen</strong><span>Die Website zeigt, welche Ansicht für Ihr Instrument hilfreich ist.</span></li>
+        <li><strong>Anfrage zwischenspeichern</strong><span>Nach den Kontaktdaten ist Ihre Anfrage sicher erfasst.</span></li>
+        <li><strong>Details ergänzen</strong><span>Weitere Fotos und Angaben helfen, sind aber nicht zwingend für den Start.</span></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="section city-region" aria-labelledby="city-region-title">
+    <div class="section-inner split">
+      <div>
+        <p class="eyebrow">{city.region}</p>
+        <h2 id="city-region-title">Regional gedacht, ehrlich organisiert.</h2>
+        <p>{city.regionalNote}</p>
+        <p>{city.planningNote}</p>
+        <div class="city-area-list" aria-label={`Orte in ${city.region}`}>
+          {city.areas.map((area) => <span>{area}</span>)}
+        </div>
+      </div>
+      <div class="quiet-card city-transparency-card">
+        <strong>Online starten, persönlich abstimmen.</strong>
+        <p>Die Stadtseite kennzeichnet die Region Ihres Instruments. Der erste Kontakt und die erste Prüfung erfolgen online; alles Weitere wird nicht pauschal versprochen, sondern im Einzelfall geklärt.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section city-photo-guide" aria-labelledby="city-photo-title">
+    <div class="section-inner">
+      <div class="city-section-heading">
+        <div>
+          <p class="eyebrow">Fotos für die erste Prüfung</p>
+          <h2 id="city-photo-title">Was sollte auf den Bildern zu sehen sein?</h2>
+        </div>
+        <p>Fotografieren Sie bei ruhigem Licht und ohne Filter. Sie müssen nichts auseinanderbauen oder reinigen.</p>
+      </div>
+      <div class="city-photo-grid">
+        <div><strong>Gesamtansicht</strong><p>Das ganze Instrument von vorn; bei Bögen den vollständigen Bogen.</p></div>
+        <div><strong>Rückseite</strong><p>Die zweite Gesamtansicht hilft, Bauart und Zustand besser zu erkennen.</p></div>
+        <div><strong>Hinweise</strong><p>Etiketten, Stempel, Signaturen, Reparaturzettel oder gut lesbare Beschriftungen.</p></div>
+        <div><strong>Was dazugehört</strong><p>Bögen, Koffer, Rechnungen und weitere gemeinsam aufbewahrte Instrumente.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section city-topics" aria-labelledby="city-topics-title">
+    <div class="section-inner narrow">
+      <p class="eyebrow">Passende Fachinformationen</p>
+      <h2 id="city-topics-title">Worum geht es bei Ihrem Instrument?</h2>
+      <p>Die folgenden Seiten erklären genauer, welche Fotos und Angaben für die jeweilige Art hilfreich sind. Danach können Sie direkt mit der Anfrage aus {city.name} beginnen.</p>
+      <div class="city-topic-grid">
+        <a href="/geige-verkaufen/"><strong>Geige verkaufen</strong><span>Ansichten, Etikett und Zustand richtig zeigen</span></a>
+        <a href="/cello-verkaufen/"><strong>Cello verkaufen</strong><span>Großes Instrument sicher dokumentieren</span></a>
+        <a href="/bogen-verkaufen/"><strong>Bogen verkaufen</strong><span>Stempel, Frosch und Spitze fotografieren</span></a>
+        <a href="/kontrabass-verkaufen/"><strong>Kontrabass verkaufen</strong><span>Erst Fotos senden, nicht vorschnell transportieren</span></a>
+        <a href="/instrument-geerbt/"><strong>Instrument geerbt</strong><span>Nachlass oder Sammlung gemeinsam zeigen</span></a>
+        <a href="/instrument-verkaufen/"><strong>Andere Instrumente</strong><span>Einfach auswählen oder „Ich weiß es nicht“ nutzen</span></a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section city-faq" aria-labelledby="city-faq-title">
+    <div class="section-inner narrow faq-section">
+      <p class="eyebrow">Häufige Fragen aus {city.name}</p>
+      <h2 id="city-faq-title">Bevor Sie beginnen</h2>
+      <details>
+        <summary>Muss ich das Instrument zuerst versenden oder vorbeibringen?</summary>
+        <p>Nein. Der erste Schritt ist die Online-Anfrage mit Fotos. Ob später ein Transport oder eine Übergabe sinnvoll ist, wird erst nach der persönlichen Sichtung geklärt.</p>
+      </details>
+      <details>
+        <summary>Was mache ich, wenn ich Hersteller oder Instrumentenart nicht kenne?</summary>
+        <p>Wählen Sie „Ich weiß es nicht“ und zeigen Sie das Instrument so vollständig wie möglich. Fehlendes Fachwissen ist kein Nachteil und Angaben können übersprungen werden.</p>
+      </details>
+      <details>
+        <summary>Kann ich mehrere Instrumente oder einen Nachlass aus {city.name} zeigen?</summary>
+        <p>Ja. Fotografieren Sie zuerst, was zusammengehört. Bögen, Koffer, Unterlagen und kleine Beschriftungen können wichtige Zusammenhänge sichtbar machen.</p>
+      </details>
+      <details>
+        <summary>Bekomme ich automatisch einen Preis angezeigt?</summary>
+        <p>Nein. Eine seriöse Prüfung soll nicht allein aus wenigen Formulardaten automatisch einen Wert ableiten. Die Anfrage wird persönlich angesehen und anschließend individuell beantwortet.</p>
+      </details>
+      <div class="city-final-cta">
+        <div>
+          <strong>Instrument aus {city.name} jetzt zeigen</strong>
+          <span>Das erste Foto und Ihre Kontaktdaten reichen zum Zwischenspeichern.</span>
+        </div>
+        <a class="button primary" href={offerUrl}>Anfrage beginnen</a>
+      </div>
+    </div>
+  </section>
+</article>
