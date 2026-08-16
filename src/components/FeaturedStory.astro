@@ -1,48 +1,114 @@
-<section class="featured-story" aria-labelledby="featured-story-title">
-  <div class="featured-story-inner">
-    <picture>
-      <source
-        type="image/webp"
-        srcset="/images/stories/albert-volkmann-1908/front-three-quarter-640.webp 640w, /images/stories/albert-volkmann-1908/front-three-quarter-1200.webp 1200w"
-        sizes="(max-width: 800px) 100vw, 48vw"
-      />
-      <img
-        src="/images/stories/albert-volkmann-1908/front-three-quarter-1200.webp"
-        alt="Albert-Volkmann-Kontrabass von 1908 in schräger Vorderansicht"
-        width="1200"
-        height="1941"
-        loading="lazy"
-        decoding="async"
-      />
-    </picture>
-    <div class="featured-story-copy">
-      <p class="eyebrow">Instrumentengeschichte · Schönbach 1908</p>
-      <h2 id="featured-story-title">Der Bass, der die Hitze überstand.</h2>
-      <p>Ein Albert Volkmann, ein Berufsmusiker in Essen und die überlieferte Erinnerung an einen Kriegsbrand: Dieser Kontrabass trägt mehr als ein Jahrhundert nicht nur im Holz, sondern auch in seinem veränderten Lack.</p>
-      <a class="button secondary" href="/instrumentengeschichten/albert-volkmann-1908/">Die ganze Geschichte lesen</a>
+<section class="featured-stories" aria-labelledby="featured-stories-title">
+  <div class="featured-stories-inner">
+    <header>
+      <p class="eyebrow">Instrumentengeschichten</p>
+      <h2 id="featured-stories-title">Was Instrumente bewahren.</h2>
+      <p>Werkstattzettel, Gebrauchsspuren und Erinnerungen machen aus einem Instrument mehr als Holz und Lack. Zwei Geschichten über Bässe, die beinahe verloren gewesen wären.</p>
+    </header>
+
+    <div class="featured-stories-grid">
+      <article class="featured-story-card">
+        <picture>
+          <source
+            type="image/webp"
+            srcset="/images/stories/albert-volkmann-1908/front-three-quarter-640.webp 640w, /images/stories/albert-volkmann-1908/front-three-quarter-1200.webp 1200w"
+            sizes="(max-width: 800px) 100vw, 43vw"
+          />
+          <img
+            src="/images/stories/albert-volkmann-1908/front-three-quarter-1200.webp"
+            alt="Albert-Volkmann-Kontrabass von 1908 in schräger Vorderansicht"
+            width="1200"
+            height="1941"
+            loading="lazy"
+            decoding="async"
+          />
+        </picture>
+        <div class="featured-story-copy">
+          <p class="story-meta">Schönbach · 1908</p>
+          <h3>Der Bass, der die Hitze überstand.</h3>
+          <p>Ein Albert Volkmann, ein Berufsmusiker in Essen und die überlieferte Erinnerung an einen Kriegsbrand.</p>
+          <a href="/instrumentengeschichten/albert-volkmann-1908/">Geschichte lesen</a>
+        </div>
+      </article>
+
+      <article class="featured-story-card">
+        <picture>
+          <source
+            type="image/webp"
+            srcset="/images/stories/johannes-rubner-1967/front-640.webp 640w, /images/stories/johannes-rubner-1967/front-1200.webp 1200w"
+            sizes="(max-width: 800px) 100vw, 43vw"
+          />
+          <img
+            src="/images/stories/johannes-rubner-1967/front-1200.webp"
+            alt="Johannes-Rubner-Kontrabass von 1967 nach seiner Reparatur"
+            width="1200"
+            height="1800"
+            loading="lazy"
+            decoding="async"
+          />
+        </picture>
+        <div class="featured-story-copy">
+          <p class="story-meta">Markneukirchen · 1967</p>
+          <h3>Der Bass aus der stillen Wohnung.</h3>
+          <p>Ein Berliner Wohnungsfund, eine aufwendige Reparatur und ein rätselhafter Zeitungsausschnitt von 1982.</p>
+          <a href="/instrumentengeschichten/johannes-rubner-1967/">Geschichte lesen</a>
+        </div>
+      </article>
     </div>
   </div>
 </section>
 
 <style>
-  .featured-story {
-    padding: 90px clamp(20px, 6vw, 90px);
+  .featured-stories {
+    padding: 95px clamp(20px, 6vw, 90px);
     background: #23201c;
     color: #f8f3e9;
   }
-  .featured-story-inner {
-    display: grid;
-    grid-template-columns: minmax(280px, 0.85fr) minmax(0, 1.15fr);
+  .featured-stories-inner {
     max-width: 1160px;
     margin: auto;
-    align-items: center;
   }
-  .featured-story picture {
+  .featured-stories header {
+    display: grid;
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: 40px;
+    align-items: end;
+    margin-bottom: 48px;
+  }
+  .featured-stories header .eyebrow {
+    grid-column: 1 / -1;
+    margin-bottom: -24px;
+    color: #d6b989;
+  }
+  .featured-stories h2 {
+    margin: 0;
+    font-size: clamp(42px, 6vw, 72px);
+    font-weight: 400;
+    line-height: 1;
+  }
+  .featured-stories header > p:last-child {
+    margin: 0;
+    color: #d8d1c6;
+    font-size: 18px;
+  }
+  .featured-stories-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 22px;
+  }
+  .featured-story-card {
+    display: grid;
+    grid-template-columns: minmax(170px, 0.8fr) minmax(0, 1.2fr);
+    min-height: 470px;
+    background: #f3efe7;
+    color: #211d18;
+  }
+  .featured-story-card picture {
     display: block;
-    height: min(72vh, 650px);
+    min-height: 470px;
     overflow: hidden;
   }
-  .featured-story img {
+  .featured-story-card img {
     display: block;
     width: 100%;
     height: 100%;
@@ -50,34 +116,63 @@
     object-position: center 42%;
   }
   .featured-story-copy {
-    padding: clamp(38px, 7vw, 92px);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: clamp(26px, 4vw, 48px);
   }
-  .featured-story .eyebrow {
-    color: #d6b989;
+  .featured-story-copy .story-meta {
+    margin: 0 0 14px;
+    color: #8e5b22;
+    font-family: Arial, sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
   }
-  .featured-story h2 {
-    margin: 0 0 24px;
-    font-size: clamp(38px, 5vw, 64px);
+  .featured-story-copy h3 {
+    margin: 0 0 18px;
+    font-size: clamp(28px, 3.2vw, 42px);
     font-weight: 400;
     line-height: 1.04;
   }
-  .featured-story p:not(.eyebrow) {
-    color: #d8d1c6;
-    font-size: 19px;
+  .featured-story-copy > p:not(.story-meta) {
+    margin: 0 0 24px;
+    color: #625b51;
+    font-size: 16px;
   }
-  .featured-story .secondary {
-    border-color: #d6b989;
-    color: #fff;
+  .featured-story-copy a {
+    align-self: flex-start;
+    margin-top: auto;
+    border-bottom: 1px solid #8e5b22;
+    color: #6e431d;
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: none;
   }
-  @media (max-width: 800px) {
-    .featured-story-inner {
+  @media (max-width: 1000px) {
+    .featured-stories-grid {
       grid-template-columns: 1fr;
     }
-    .featured-story picture {
-      height: 520px;
+    .featured-story-card {
+      grid-template-columns: minmax(220px, 0.75fr) minmax(0, 1.25fr);
+    }
+  }
+  @media (max-width: 650px) {
+    .featured-stories header,
+    .featured-story-card {
+      grid-template-columns: 1fr;
+    }
+    .featured-stories header .eyebrow {
+      margin-bottom: -15px;
+    }
+    .featured-story-card picture {
+      min-height: 460px;
+      max-height: 540px;
     }
     .featured-story-copy {
-      padding: 42px 8px 10px;
+      min-height: 310px;
     }
   }
 </style>

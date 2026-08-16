@@ -1,0 +1,609 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { site } from '../../config/site';
+
+const title = 'Johannes-Rubner-Kontrabass von 1967 – Fund in einer Berliner Wohnung';
+const description = 'Die Geschichte eines Johannes-Rubner-Kontrabasses von 1967: bei einer Wohnungsauflösung in Berlin entdeckt, repariert und begleitet von einem rätselhaften Zeitungsausschnitt aus dem Jahr 1982.';
+const canonical = '/instrumentengeschichten/johannes-rubner-1967/';
+const articleUrl = new URL(canonical, site.url).toString();
+const articleImage = new URL('/images/stories/johannes-rubner-1967/front-1200.webp', site.url).toString();
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'Article',
+  headline: title,
+  description,
+  image: articleImage,
+  datePublished: '2026-08-17',
+  dateModified: '2026-08-17',
+  inLanguage: 'de-DE',
+  mainEntityOfPage: articleUrl,
+  author: {
+    '@type': 'Organization',
+    name: site.name,
+    url: site.url
+  },
+  publisher: {
+    '@type': 'Organization',
+    name: site.name,
+    url: site.url
+  },
+  about: [
+    { '@type': 'Thing', name: 'Johannes Rubner' },
+    { '@type': 'Thing', name: 'Kontrabassbau in Markneukirchen' },
+    { '@type': 'Thing', name: 'Restaurierung historischer Musikinstrumente' }
+  ]
+};
+---
+
+<BaseLayout
+  title={title}
+  description={description}
+  canonical={canonical}
+  image="/images/stories/johannes-rubner-1967/front-1200.webp"
+  ogType="article"
+  structuredData={structuredData}
+>
+  <article class="story-page rubner-story">
+    <header class="story-hero">
+      <div class="story-hero-copy">
+        <p class="story-kicker">Instrumentengeschichte · Markneukirchen 1967</p>
+        <h1>Der Bass aus der stillen Wohnung</h1>
+        <p class="story-deck">Ein Kontrabass von Johannes Rubner, gefunden bei einer Wohnungsauflösung in Berlin. Sein Zustand war schlecht, seine Geschichte fast verloren – bis im Inneren ein Zeitungsausschnitt aus dem Jahr 1982 auftauchte.</p>
+        <div class="story-meta" aria-label="Kurzdaten">
+          <span><strong>Erbauer</strong> Johannes Rubner</span>
+          <span><strong>Jahr</strong> 1967</span>
+          <span><strong>Fundort</strong> Berlin</span>
+        </div>
+      </div>
+      <picture class="story-hero-media">
+        <source
+          type="image/webp"
+          srcset="/images/stories/johannes-rubner-1967/front-640.webp 640w, /images/stories/johannes-rubner-1967/front-1200.webp 1200w"
+          sizes="(max-width: 860px) 100vw, 46vw"
+        />
+        <img
+          src="/images/stories/johannes-rubner-1967/front-1200.webp"
+          alt="Johannes-Rubner-Kontrabass von 1967 nach seiner Reparatur"
+          width="1200"
+          height="1800"
+          fetchpriority="high"
+        />
+      </picture>
+    </header>
+
+    <div class="story-body">
+      <p class="story-prologue">Wenn eine Wohnung aufgelöst wird, verlieren die Dinge ihren Zusammenhang. Möbel werden getragen, Schubladen geleert, Papiere sortiert. Und manchmal steht zwischen all dem ein Instrument, das zu groß ist, um übersehen zu werden – aber dessen Geschichte niemand mehr erzählen kann.</p>
+
+      <p>Dieser Kontrabass wurde 1967 von Johannes Rubner in Markneukirchen gebaut. Der Werkstattzettel im Inneren ist eindeutig: „Johannes Rubner · Meisterwerkstatt für Kontrabässe · Markneukirchen“, darunter das handschriftlich eingetragene Baujahr. Auch der Rubner-Schriftzug am oberen Rücken ist klar sichtbar.</p>
+
+      <p>Johannes Rubner, Jahrgang 1925, erlernte das Handwerk bei Meister Otto Rubner und legte 1959 seine Meisterprüfung ab. Ein Ausstellungskatalog von 1978 führt ihn als staatlich anerkannten Meister des Kunsthandwerks. Der Bass entstand damit in einer Werkstatttradition, die tief in Markneukirchen verwurzelt war – in jener vogtländischen Stadt, in der Instrumentenbauer, Mechanikmacher, Saitenhersteller und Musiker über Generationen voneinander lebten.</p>
+    </div>
+
+    <div class="story-gallery story-gallery-pair" aria-label="Vorder- und Rückansicht des Rubner-Kontrabasses">
+      <figure>
+        <img src="/images/stories/johannes-rubner-1967/front-1200.webp" alt="Vorderansicht des Johannes-Rubner-Kontrabasses" width="1200" height="1800" loading="lazy" decoding="async" />
+        <figcaption>Die Vorderseite nach der Reparatur: spielbereit, aber mit sichtbaren Spuren des früheren Zustands.</figcaption>
+      </figure>
+      <figure>
+        <img src="/images/stories/johannes-rubner-1967/back-960.webp" alt="Rückansicht des Johannes-Rubner-Kontrabasses mit geflammtem Holz" width="960" height="1440" loading="lazy" decoding="async" />
+        <figcaption>Der zweiteilige, geflammte Rücken mit Rubner-Signatur und über Jahrzehnte entstandenen Gebrauchsspuren.</figcaption>
+      </figure>
+    </div>
+
+    <div class="story-body">
+      <p class="story-section-label">Der Berliner Fund</p>
+      <h2>Was bleibt, wenn eine Wohnung leer wird</h2>
+
+      <p>Viele Jahre später stand der Bass in einer Berliner Wohnung. Wer ihn gespielt hatte, wie lange er dort schon wartete und warum er schließlich verstummte, ist nicht mehr bekannt. Überliefert ist nur der Moment seines Wiederauftauchens: Bei der Auflösung der Wohnung wurde er gefunden – in einem Zustand, der eine gründliche Reparatur notwendig machte.</p>
+
+      <p>Die heutigen Aufnahmen zeigen das Instrument nach diesen Arbeiten. Kanten, Lack und Zargen tragen noch immer Kratzer, Druckstellen und Abrieb. Sie wurden nicht wegretuschiert, denn solche Spuren gehören zu einem Arbeitsinstrument. Welches Teil geöffnet, geleimt, gerichtet oder ersetzt werden musste, wurde nicht schriftlich festgehalten. Sicher ist: Der Bass bekam seine Stabilität und seine Stimme zurück.</p>
+
+      <blockquote class="story-pullquote">Zwischen Dingen, deren Besitzer nicht mehr antworten konnten, stand ein Instrument, das noch etwas zu sagen hatte.</blockquote>
+    </div>
+
+    <figure class="story-gallery story-gallery-wide">
+      <img src="/images/stories/johannes-rubner-1967/body-detail-960.webp" alt="Detail der Decke, des F-Lochs und des Stegs am Rubner-Kontrabass" width="960" height="1440" loading="lazy" decoding="async" />
+      <figcaption>Decke, F-Loch und Steg im heutigen Zustand: alte Substanz neben den Spuren späterer Instandsetzung.</figcaption>
+    </figure>
+
+    <div class="story-body">
+      <p class="story-section-label">Das Papier im Resonanzkörper</p>
+      <h2>Eine Nachricht aus dem Jahr 1982</h2>
+
+      <p>Im Inneren des Basses befand sich ein alter Zeitungsausschnitt. Vom ursprünglichen Fund ist heute nur noch das Jahr 1982 in Erinnerung; Zeitung, Überschrift und Inhalt sind nicht dokumentiert. Vielleicht hatte das Papier mit dem früheren Besitzer zu tun. Vielleicht war es durch ein F-Loch hineingerutscht, als Erinnerung versteckt oder nur als rasch gefaltetes Stück Papier aufbewahrt worden.</p>
+
+      <p>Der verlorene Text lässt sich nicht rekonstruieren. Aber er lädt zu einer Szene ein, die zu einem Berliner Musikerleben jener Zeit passen könnte:</p>
+    </div>
+
+    <section class="newspaper" aria-labelledby="newspaper-title">
+      <div class="newspaper-topline">
+        <span>Berliner Lokalnotiz</span>
+        <span>Herbst 1982</span>
+      </div>
+      <p class="newspaper-disclaimer">Literarische Rekonstruktion · nicht der Wortlaut des gefundenen Zeitungsausschnitts</p>
+      <h2 id="newspaper-title">Vier Stockwerke für einen tiefen Ton</h2>
+      <p class="newspaper-lead">Ein verregnetes Hofkonzert zieht ins Treppenhaus – und ein fünfzehn Jahre alter Kontrabass aus Markneukirchen wird zum heimlichen Mittelpunkt.</p>
+      <div class="newspaper-columns">
+        <p>Kurz nach sieben fielen die ersten Tropfen. Die Stühle standen schon im Hinterhof, auf den Fensterbänken warteten Gläser, und irgendwo im zweiten Stock kühlte eine Schüssel Kartoffelsalat. Nur die Musiker blickten zum Himmel. Die Geigen ließen sich unter Mänteln retten. Der Kontrabass nicht. Dafür war er zu groß, zu schwer und an diesem Abend offenbar zu wichtig.</p>
+
+        <p>Eine Bewohnerin öffnete die Haustür. Wenige Minuten später saß das kleine Ensemble zwischen Briefkästen und Treppengeländer. Der Bassist stellte sein orangebraunes Instrument auf die Steinfliesen. Der erste tiefe Ton stieg durch das ganze Haus. Türen gingen auf, Kinder setzten sich auf die Stufen, und selbst im vierten Stock soll noch das Holz vibriert haben.</p>
+
+        <p>Auf dem Rücken des Instruments stand der Name Rubner, im Inneren das Jahr 1967. Fünfzehn Jahre hatte der Bass zu diesem Zeitpunkt hinter sich – jung für ein Instrument, aber alt genug für erste Kratzer, Transporte und Geschichten. Als das letzte Stück verklungen war, blieb das Publikum im Treppenhaus. Vielleicht, weil es draußen noch regnete. Vielleicht, weil niemand den tiefen Ton als Erster unterbrechen wollte.</p>
+
+        <p>Am Ende, so hätte der Artikel schließen können, sagte der Musiker einen Satz, der das Ausschneiden wert gewesen wäre: „Manchmal braucht Berlin keinen Konzertsaal. Manchmal reichen ein Treppenhaus und ein Bass, der das ganze Haus zusammenhält.“</p>
+      </div>
+    </section>
+
+    <div class="story-body">
+      <p class="story-afterword">So könnte der Ausschnitt geklungen haben. Ebenso gut kann er von etwas völlig anderem gehandelt haben. Die erfundene Lokalnotiz ersetzt keine Provenienz – sie macht nur sichtbar, welche Leerstelle das gefundene Papier hinterlassen hat.</p>
+
+      <figure class="story-inline-figure">
+        <img src="/images/stories/johannes-rubner-1967/label-1200.webp" alt="Werkstattzettel von Johannes Rubner mit dem handschriftlichen Baujahr 1967" width="1200" height="835" loading="lazy" decoding="async" />
+        <figcaption>Der Werkstattzettel dokumentiert Erbauer, Werkstattort und Baujahr eindeutig.</figcaption>
+      </figure>
+
+      <p class="story-section-label">Reparatur und Rückkehr</p>
+      <h2>Ein Instrument wieder ins Gleichgewicht bringen</h2>
+
+      <p>Ein Kontrabass steht permanent unter Spannung. Saiten, Steg, Decke, Stimmstock, Hals und Korpus müssen als System zusammenarbeiten. Wird ein Instrument lange ungünstig gelagert oder nicht gepflegt, kann mehr nötig sein als ein neuer Satz Saiten. Offene Leimfugen, ein verzogener Steg oder eine falsche Einstellung können Stabilität, Ansprache und Spielbarkeit beeinträchtigen.</p>
+
+      <p>Welche dieser Arbeiten bei diesem Rubner im Einzelnen ausgeführt wurden, ist nicht überliefert. Auf den Fotos ist jedoch der Zustand nach seiner Rückkehr zu sehen: vier Saiten, eine eingerichtete Mechanik und ein heller Steg mit dem Stempel „W. J. Stegmüller“. Der Bass ist kein Fundstück mehr, das auf seine Entsorgung wartet, sondern wieder ein Musikinstrument.</p>
+    </div>
+
+    <figure class="story-gallery story-gallery-landscape">
+      <img src="/images/stories/johannes-rubner-1967/bridge-1200.webp" alt="Heller Kontrabasssteg mit dem Stempel W. J. Stegmüller" width="1200" height="800" loading="lazy" decoding="async" />
+      <figcaption>Der Steg im heutigen Zustand. Sein Stempel ist sichtbar; Zeitpunkt und Zusammenhang der Anfertigung sind nicht dokumentiert.</figcaption>
+    </figure>
+
+    <div class="story-gallery story-gallery-pair story-gallery-details" aria-label="Signatur und Mechanik des Rubner-Kontrabasses">
+      <figure>
+        <img src="/images/stories/johannes-rubner-1967/brand-1200.webp" alt="Rubner-Schriftzug am oberen Rücken des Kontrabasses" width="1200" height="800" loading="lazy" decoding="async" />
+        <figcaption>Der deutlich sichtbare Rubner-Schriftzug am oberen Rücken.</figcaption>
+      </figure>
+      <figure>
+        <img src="/images/stories/johannes-rubner-1967/scroll-960.webp" alt="Schnecke und gravierte Mechanik des Johannes-Rubner-Kontrabasses" width="960" height="1440" loading="lazy" decoding="async" />
+        <figcaption>Schnecke und gravierte Mechanik – funktionale Bauteile mit handwerklicher Präsenz.</figcaption>
+      </figure>
+    </div>
+
+    <div class="story-body">
+      <section class="story-evidence" aria-labelledby="evidence-title">
+        <p class="story-section-label">Transparente Einordnung</p>
+        <h2 id="evidence-title">Was belegt, überliefert und erfunden ist</h2>
+        <div class="story-evidence-grid">
+          <div>
+            <h3>Am Instrument belegt</h3>
+            <ul>
+              <li>Johannes Rubner baute den Bass 1967 in Markneukirchen.</li>
+              <li>Werkstattzettel und Rubner-Schriftzug sind deutlich sichtbar.</li>
+              <li>Der heutige Zustand nach der Reparatur ist fotografisch dokumentiert.</li>
+              <li>Der Bass besitzt vier Saiten und einen Steg mit Stegmüller-Stempel.</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Zum Fund überliefert</h3>
+            <ul>
+              <li>Der Bass wurde bei einer Wohnungsauflösung in Berlin gefunden.</li>
+              <li>Er befand sich in schlechtem Zustand und musste repariert werden.</li>
+              <li>Im Korpus lag ein Zeitungsausschnitt aus dem Jahr 1982.</li>
+              <li>Der Inhalt des Artikels ist heute nicht mehr bekannt.</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Literarisch ergänzt</h3>
+            <ul>
+              <li>Das verregnete Hofkonzert und das Treppenhaus sind erfunden.</li>
+              <li>Auch der zitierte Musiker und seine Worte sind Teil der Rekonstruktion.</li>
+              <li>Die Szene zeigt eine mögliche Geschichte, behauptet aber keine Provenienz.</li>
+            </ul>
+          </div>
+        </div>
+        <p class="story-open-question"><strong>Offen bleiben:</strong> Name des früheren Besitzers, Berliner Adresse, ursprünglicher Zeitungsartikel sowie Zeitpunkt und genauer Umfang der Reparaturen.</p>
+      </section>
+
+      <h2>Nicht entsorgt, sondern wieder gehört</h2>
+      <p>Bei einer Wohnungsauflösung wird schnell entschieden, was bleibt und was geht. Ein beschädigter Kontrabass kann dabei wie ein sperriges Problem wirken. Dieser Rubner hatte Glück: Jemand sah nicht nur seinen Zustand, sondern auch seine Substanz.</p>
+
+      <p>Der Werkstattzettel bewahrte den Namen seines Erbauers. Der Zeitungsausschnitt bewahrte wenigstens ein Jahr. Die Reparatur gab dem Instrument zurück, was Papier allein nicht festhalten kann: die Möglichkeit, wieder zu klingen.</p>
+
+      <div class="story-cta">
+        <div>
+          <strong>Ein Instrument bei einer Wohnungsauflösung gefunden?</strong>
+          <span>Fotografieren Sie das ganze Instrument, Zettel, Stempel, Schäden und alle Papiere, bevor etwas gereinigt oder entsorgt wird.</span>
+        </div>
+        <a class="button primary" href="/instrument-verkaufen/?type=double_bass">Kontrabass zeigen</a>
+      </div>
+
+      <section class="story-sources" aria-labelledby="sources-title">
+        <h2 id="sources-title">Quellen und Einordnung</h2>
+        <p>Fundumstände, früherer Zustand, Reparatur und Zeitungsausschnitt beruhen auf den Angaben zum Instrument. Erbauer, Baujahr und Merkmale sind fotografisch dokumentiert. Für den historischen Hintergrund wurden folgende Quellen herangezogen:</p>
+        <ul>
+          <li><a href="https://www.exempla.info/wp-content/uploads/2025/12/1978_Katalog_EXEMPLA_Musik_und_Handwerk.pdf" target="_blank" rel="noopener noreferrer">Exempla 1978 „Musik und Handwerk“: Kurzbiografie Johannes Rubner</a></li>
+          <li><a href="https://www.rubner-markneukirchen.de/firmengeschichte.html" target="_blank" rel="noopener noreferrer">Rubner Markneukirchen: Firmengeschichte und Werkstatttradition</a></li>
+          <li><a href="https://instrumental-competition.de/der-wettbewerb/allgemeines/preistraeger-geschichte" target="_blank" rel="noopener noreferrer">Internationaler Instrumentalwettbewerb Markneukirchen: Geschichte</a></li>
+          <li><a href="https://www.marko-ackert.com/alte-instrumente/" target="_blank" rel="noopener noreferrer">Marko Ackert Kontrabassbau: dokumentierte Vergleichsinstrumente von Johannes Rubner</a></li>
+        </ul>
+      </section>
+
+      <nav class="related-topics" aria-label="Verwandte Themen">
+        <strong>Passende Informationen</strong>
+        <a href="/instrumentengeschichten/albert-volkmann-1908/">Instrumentengeschichte: Albert Volkmann 1908</a>
+        <a href="/kontrabass-verkaufen/">Kontrabass verkaufen</a>
+        <a href="/instrument-geerbt/">Instrument oder Sammlung geerbt</a>
+        <a href="/berlin/">Instrument aus Berlin anbieten</a>
+      </nav>
+    </div>
+  </article>
+</BaseLayout>
+
+<style>
+  .story-page {
+    background: #f7f6f2;
+  }
+  .story-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr);
+    min-height: 760px;
+    background: #1f2525;
+    color: #f8f3e9;
+  }
+  .story-hero-copy {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: clamp(70px, 9vw, 145px);
+  }
+  .story-kicker,
+  .story-section-label {
+    margin: 0 0 15px;
+    color: #9a5b2c;
+    font-family: Arial, sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .story-kicker {
+    color: #d9b37f;
+  }
+  .story-hero h1 {
+    max-width: 850px;
+    margin: 0 0 30px;
+    font-size: clamp(52px, 7.4vw, 104px);
+    font-weight: 400;
+    line-height: 0.96;
+  }
+  .story-deck {
+    max-width: 780px;
+    margin: 0;
+    color: #d5d4cc;
+    font-size: clamp(19px, 2vw, 24px);
+  }
+  .story-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 30px;
+    margin-top: 40px;
+    padding-top: 24px;
+    border-top: 1px solid rgba(255, 255, 255, 0.18);
+    color: #c8c8c0;
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+  }
+  .story-meta strong {
+    margin-right: 6px;
+    color: #fff;
+  }
+  .story-hero-media {
+    display: block;
+    min-height: 760px;
+    overflow: hidden;
+  }
+  .story-hero-media img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 43%;
+  }
+  .story-body {
+    max-width: 820px;
+    margin: auto;
+    padding: 88px 24px 0;
+  }
+  .story-body > p {
+    font-size: 19px;
+  }
+  .story-prologue {
+    margin-top: 0;
+    color: #3f3b35;
+    font-size: clamp(25px, 3vw, 34px) !important;
+    line-height: 1.35;
+  }
+  .story-prologue::first-letter {
+    float: left;
+    margin: 6px 10px 0 0;
+    color: #925120;
+    font-size: 78px;
+    line-height: 0.72;
+  }
+  .story-body h2 {
+    margin: 0 0 24px;
+    font-size: clamp(36px, 5vw, 58px);
+    font-weight: 400;
+    line-height: 1.08;
+  }
+  .story-body .story-section-label {
+    margin-top: 70px;
+  }
+  .story-gallery {
+    margin: 90px auto 0;
+  }
+  .story-gallery figure,
+  figure.story-gallery,
+  .story-inline-figure {
+    margin-bottom: 0;
+  }
+  .story-gallery img,
+  .story-inline-figure img {
+    display: block;
+    width: 100%;
+    background: #e5e0d6;
+  }
+  .story-gallery figcaption,
+  .story-inline-figure figcaption {
+    padding: 14px 2px 0;
+    color: #6c655c;
+    font-family: Arial, sans-serif;
+    font-size: 12px;
+  }
+  .story-gallery-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    max-width: 1120px;
+    padding: 0 24px;
+  }
+  .story-gallery-pair figure {
+    margin: 0;
+  }
+  .story-gallery-pair:not(.story-gallery-details) img {
+    aspect-ratio: 2 / 3;
+    object-fit: cover;
+  }
+  .story-gallery-wide {
+    max-width: 850px;
+    padding: 0 24px;
+  }
+  .story-gallery-wide img {
+    max-height: 760px;
+    object-fit: cover;
+    object-position: center 52%;
+  }
+  .story-gallery-landscape {
+    max-width: 1080px;
+    padding: 0 24px;
+  }
+  .story-gallery-details {
+    align-items: stretch;
+  }
+  .story-gallery-details figure {
+    display: flex;
+    flex-direction: column;
+  }
+  .story-gallery-details img {
+    flex: 1;
+    min-height: 420px;
+    object-fit: cover;
+  }
+  .story-gallery-details figure:first-child img {
+    object-position: center;
+  }
+  .story-inline-figure {
+    margin: 75px -85px 90px;
+  }
+  .story-pullquote {
+    margin: 72px -85px;
+    padding: 10px 0 10px 34px;
+    border-left: 4px solid #9a5b2c;
+    color: #44382d;
+    font-size: clamp(34px, 5vw, 58px);
+    line-height: 1.12;
+  }
+  .newspaper {
+    max-width: 1060px;
+    margin: 88px auto 0;
+    padding: clamp(34px, 6vw, 72px);
+    border: 1px solid #b9aa8c;
+    box-shadow: 0 18px 50px rgba(54, 43, 27, 0.12);
+    background: #eee4cc;
+    color: #26231e;
+    transform: rotate(-0.35deg);
+  }
+  .newspaper-topline {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-top: 3px solid #27231d;
+    border-bottom: 1px solid #27231d;
+    font-family: Arial, sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .newspaper-disclaimer {
+    margin: 24px 0 12px;
+    color: #755128;
+    font-family: Arial, sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .newspaper h2 {
+    max-width: 850px;
+    margin: 0;
+    font-size: clamp(46px, 8vw, 90px);
+    font-weight: 400;
+    letter-spacing: -0.035em;
+    line-height: 0.92;
+  }
+  .newspaper-lead {
+    max-width: 820px;
+    margin: 26px 0 34px;
+    padding-bottom: 25px;
+    border-bottom: 1px solid #766d5c;
+    font-size: clamp(20px, 2.7vw, 29px);
+    font-weight: 700;
+    line-height: 1.25;
+  }
+  .newspaper-columns {
+    columns: 2;
+    column-gap: 42px;
+    column-rule: 1px solid #b9aa8c;
+    font-size: 16px;
+    line-height: 1.55;
+  }
+  .newspaper-columns p {
+    margin-top: 0;
+    break-inside: avoid;
+  }
+  .story-afterword {
+    padding: 24px 28px;
+    border-left: 4px solid #9a5b2c;
+    background: #ece9e2;
+    color: #5d574f;
+  }
+  .story-evidence {
+    margin: 5px -150px 80px;
+    padding: clamp(28px, 5vw, 54px);
+    background: #252b2a;
+    color: #f6f1e7;
+  }
+  .story-evidence .story-section-label {
+    margin-top: 0;
+    color: #d9b37f;
+  }
+  .story-evidence h2 {
+    max-width: 760px;
+  }
+  .story-evidence-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 34px;
+    margin-top: 40px;
+  }
+  .story-evidence h3 {
+    margin: 0 0 14px;
+    color: #e1c18e;
+    font-size: 19px;
+    font-weight: 400;
+  }
+  .story-evidence ul {
+    margin: 0;
+    padding-left: 20px;
+    color: #d5d4cc;
+  }
+  .story-evidence li + li {
+    margin-top: 9px;
+  }
+  .story-open-question {
+    margin: 35px 0 0;
+    padding-top: 25px;
+    border-top: 1px solid rgba(255, 255, 255, 0.16);
+    color: #c6c5bd;
+  }
+  .story-cta {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 28px;
+    align-items: center;
+    margin: 65px 0;
+    padding: 28px 30px;
+    background: #874918;
+    color: #fff;
+  }
+  .story-cta div {
+    display: grid;
+    gap: 3px;
+  }
+  .story-cta strong {
+    font-size: 19px;
+  }
+  .story-cta span {
+    color: #f1dfca;
+  }
+  .story-cta .button {
+    margin: 0;
+    white-space: nowrap;
+  }
+  .story-sources {
+    margin-top: 90px;
+    padding-top: 32px;
+    border-top: 1px solid #d7d2c8;
+    color: #5d574f;
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+  }
+  .story-sources h2 {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 34px;
+  }
+  .story-sources li + li {
+    margin-top: 8px;
+  }
+  .story-sources a {
+    color: #6c421c;
+  }
+  .story-body > .related-topics {
+    margin-bottom: 120px;
+  }
+  @media (max-width: 1000px) {
+    .story-evidence {
+      margin-right: 0;
+      margin-left: 0;
+    }
+    .story-evidence-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  @media (max-width: 860px) {
+    .story-hero {
+      grid-template-columns: 1fr;
+    }
+    .story-hero-copy {
+      padding: 72px 24px 60px;
+    }
+    .story-hero-media {
+      min-height: 620px;
+      max-height: 780px;
+    }
+    .story-gallery-pair,
+    .story-evidence-grid,
+    .story-cta {
+      grid-template-columns: 1fr;
+    }
+    .story-pullquote,
+    .story-inline-figure {
+      margin-right: 0;
+      margin-left: 0;
+    }
+    .story-gallery-details img {
+      min-height: 0;
+      max-height: 620px;
+    }
+    .story-cta .button {
+      justify-self: start;
+      white-space: normal;
+    }
+    .newspaper {
+      margin-right: 18px;
+      margin-left: 18px;
+      transform: none;
+    }
+    .newspaper-columns {
+      columns: 1;
+    }
+  }
+</style>
