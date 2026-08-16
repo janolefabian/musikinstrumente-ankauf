@@ -1,0 +1,509 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { site } from '../../config/site';
+
+const title = 'Albert-Volkmann-Kontrabass von 1908 – eine Geschichte aus Feuer und Lack';
+const description = 'Die überlieferte Geschichte eines Albert-Volkmann-Kontrabasses von 1908: Berufsmusiker in Essen, Kriegsbrand, veränderter Lack und ein zweites Leben nach der Restaurierung.';
+const canonical = '/instrumentengeschichten/albert-volkmann-1908/';
+const articleUrl = new URL(canonical, site.url).toString();
+const articleImage = new URL('/images/stories/albert-volkmann-1908/front-three-quarter-1200.webp', site.url).toString();
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'Article',
+  headline: title,
+  description,
+  image: articleImage,
+  datePublished: '2026-08-16',
+  dateModified: '2026-08-16',
+  inLanguage: 'de-DE',
+  mainEntityOfPage: articleUrl,
+  author: {
+    '@type': 'Organization',
+    name: site.name,
+    url: site.url
+  },
+  publisher: {
+    '@type': 'Organization',
+    name: site.name,
+    url: site.url
+  },
+  about: [
+    { '@type': 'Thing', name: 'Albert Volkmann' },
+    { '@type': 'Thing', name: 'Kontrabassbau in Schönbach' },
+    { '@type': 'Thing', name: 'Restaurierung historischer Musikinstrumente' }
+  ]
+};
+---
+
+<BaseLayout
+  title={title}
+  description={description}
+  canonical={canonical}
+  image="/images/stories/albert-volkmann-1908/front-three-quarter-1200.webp"
+  ogType="article"
+  structuredData={structuredData}
+>
+  <article class="story-page">
+    <header class="story-hero">
+      <div class="story-hero-copy">
+        <p class="story-kicker">Instrumentengeschichte · Schönbach 1908</p>
+        <h1>Der Bass, der die Hitze überstand</h1>
+        <p class="story-deck">Ein Kontrabass von Albert Volkmann, ein langes Musikerleben in Essen und die Erinnerung an einen Brand im Zweiten Weltkrieg. Nicht jedes Detail ist noch beweisbar – doch Holz, Lack und Überlieferung erzählen gemeinsam von einem außergewöhnlichen zweiten Leben.</p>
+        <div class="story-meta" aria-label="Kurzdaten">
+          <span><strong>Zuschreibung</strong> Albert Volkmann</span>
+          <span><strong>Jahr</strong> 1908</span>
+          <span><strong>Ort</strong> Schönbach</span>
+        </div>
+      </div>
+      <picture class="story-hero-media">
+        <source
+          type="image/webp"
+          srcset="/images/stories/albert-volkmann-1908/front-three-quarter-640.webp 640w, /images/stories/albert-volkmann-1908/front-three-quarter-1200.webp 1200w"
+          sizes="(max-width: 860px) 100vw, 46vw"
+        />
+        <img
+          src="/images/stories/albert-volkmann-1908/front-three-quarter-1200.webp"
+          alt="Der Albert-Volkmann-Kontrabass von 1908 nach seiner Wiederherstellung"
+          width="1200"
+          height="1941"
+          fetchpriority="high"
+        />
+      </picture>
+    </header>
+
+    <div class="story-body">
+      <p class="story-prologue">Alte Instrumente kommen selten mit einer lückenlosen Akte. Sie kommen mit Zetteln, Stempeln, Reparaturen, Erinnerungen – und manchmal mit einer Geschichte, die sich tief in ihre Oberfläche eingeschrieben hat.</p>
+
+      <p>Dieser Kontrabass wird als Arbeit Albert Volkmanns aus dem Jahr 1908 geführt. Volkmann arbeitete damals in Schönbach im Egerland, einem der großen Zentren des mitteleuropäischen Instrumentenbaus. Ein historisches Instrumentenbauer-Lexikon nennt ihn für die Jahre 1906 bis 1925 als dort tätigen Spezialisten für Kontrabässe. Auch öffentliche Herstellerdatenbanken ordnen ihn Schönbach, dem heutigen Luby, zu.</p>
+
+      <p>Schon der Bass selbst wirkt nicht wie ein anonymes Gebrauchsinstrument. Der stark geflammte Rücken und die sorgfältig gezogenen Randeinlagen zeigen hohen handwerklichen Anspruch. Eine kleine, heute nicht sicher lesbare Marke am oberen Rückenteil gehört zu den materiellen Hinweisen, die genauer geprüft werden sollten. Ein dokumentierter Vergleichsbass Volkmanns aus der Zeit um 1910 trägt ebenfalls ein Monogramm an dieser Stelle. Solche Übereinstimmungen sind Hinweise – kein Ersatz für eine Expertise, aber wichtige Teile des Puzzles.</p>
+    </div>
+
+    <div class="story-gallery story-gallery-pair" aria-label="Ansichten des Kontrabasses">
+      <figure>
+        <img src="/images/stories/albert-volkmann-1908/front-960.webp" alt="Frontalansicht des Albert-Volkmann-Kontrabasses" width="960" height="1512" loading="lazy" decoding="async" />
+        <figcaption>Die Vorderseite: ein großes, klar gezeichnetes Modell mit den Spuren eines langen Arbeitslebens.</figcaption>
+      </figure>
+      <figure>
+        <img src="/images/stories/albert-volkmann-1908/back-960.webp" alt="Geflammter Rücken des Albert-Volkmann-Kontrabasses" width="960" height="1505" loading="lazy" decoding="async" />
+        <figcaption>Der geflammte Rücken und die warme, heute wieder geschlossene Lackoberfläche.</figcaption>
+      </figure>
+    </div>
+
+    <div class="story-body">
+      <p class="story-section-label">Der Weg ins Ruhrgebiet</p>
+      <h2>Ein Instrument im Besitz eines Profis</h2>
+
+      <p>Wie der Bass von Schönbach nach Essen gelangte, lässt sich heute nicht mehr lückenlos rekonstruieren. Nach der mündlichen Überlieferung aus dem Vorbesitz befand er sich dort in den Händen eines Berufsmusikers. Sein Name und sein Ensemble sind nicht dokumentiert; die konkrete Musikerbiografie bleibt deshalb offen.</p>
+
+      <p>Was sich dagegen sicher sagen lässt: Ein Kontrabass im professionellen Alltag ist kein stilles Sammlungsstück. Er wandert zwischen Proben, Aufführungen und Wohnungen, wird getragen, aufgestellt, gespielt und immer wieder angepasst. Kleine Kantenverletzungen, Gebrauchsspuren und Reparaturen sind nicht bloß Makel. Sie zeigen, dass das Instrument seinen Zweck über Jahrzehnte erfüllt hat.</p>
+
+      <blockquote class="story-pullquote">Dieser Bass hat nicht nur Zeit überstanden. Er musste sich in ihr bewähren.</blockquote>
+
+      <p class="story-section-label">Die überlieferte Brandgeschichte</p>
+      <h2>Eine Stadt im Feuer</h2>
+
+      <p>Im Zweiten Weltkrieg soll der Bass in Essen in ein schweres Brandereignis geraten und großer Hitze ausgesetzt gewesen sein. Welche Nacht es war, in welchem Gebäude er stand und wie er gerettet wurde, ist nicht überliefert. Es wäre falsch, einen bestimmten Luftangriff nachträglich zur gesicherten Geschichte dieses Instruments zu erklären.</p>
+
+      <p>Der historische Hintergrund macht die Überlieferung jedoch nachvollziehbar. Essen war als Industriezentrum eines der am stärksten angegriffenen Ziele im Ruhrgebiet. Die Stadt dokumentiert 242 Luftangriffe; 90 Prozent der Innenstadt und 60 Prozent des übrigen Stadtgebiets wurden zerstört. Beim Großangriff vom 5. auf den 6. März 1943 entstand nach einem historischen Bericht ein kilometerweites Feuergebiet, dessen Brände noch zwei Tage später nicht vollständig erloschen waren. Auch der alte Saalbau, das Zentrum des Essener Konzertlebens und Vorläufer der heutigen Philharmonie, wurde 1943 zerstört.</p>
+
+      <div class="story-vignette">
+        <p class="story-vignette-label">Literarische Annäherung · keine dokumentierte Szene</p>
+        <p>Vielleicht stand der damals schon mehr als dreißig Jahre alte Bass in einer Musikerwohnung, vielleicht in einem Probenraum. Erst kam die Hitze, dann Rauch. Lack wurde weich, die Oberfläche dunkel und unruhig. Ob jemand das große Instrument noch durch ein Treppenhaus trug oder es erst nach dem Brand geborgen wurde, wissen wir nicht. Vorstellen lässt sich nur der Moment danach: Ein Musiker vor seinem beschädigten Arbeitsinstrument – und irgendwann die Entscheidung, es nicht aufzugeben.</p>
+      </div>
+
+      <aside class="story-respect-note">
+        <strong>Der Krieg ist keine romantische Kulisse.</strong>
+        <p>Tausende Menschen verloren in Essen ihr Leben, ihre Angehörigen und ihre Häuser. Die Geschichte des Basses ist nur ein kleines materielles Echo dieser Katastrophe – und kein Beleg dafür, in welchem konkreten Ereignis er beschädigt wurde.</p>
+      </aside>
+    </div>
+
+    <figure class="story-gallery story-gallery-wide">
+      <img src="/images/stories/albert-volkmann-1908/varnish-detail-960.webp" alt="Nahaufnahme des veränderten und restaurierten Lackbilds am Kontrabass" width="960" height="1440" loading="lazy" decoding="async" />
+      <figcaption>Unter seitlichem Licht werden Gebrauchsspuren, Kanten und das teilweise rekonstruierte Lackbild sichtbar.</figcaption>
+    </figure>
+
+    <div class="story-body">
+      <p class="story-section-label">Hitze, Lack und Wiederherstellung</p>
+      <h2>Eine zweite Haut</h2>
+
+      <p>Nach der überlieferten Geschichte hatte die Hitze den Lack des Kontrabasses stark verändert. Konservatorisch ist grundsätzlich bekannt, dass hohe Temperaturen Lackschichten erweichen, aufwerfen, verfärben oder verkohlen können und dass Rauch zusätzlich hartnäckige Ablagerungen hinterlässt. Am einzelnen Instrument lässt sich daraus allein jedoch kein bestimmtes Brandereignis beweisen.</p>
+
+      <p>Bei diesem Bass war der Zustand der Oberfläche offenbar so weit verändert, dass Teile des Lackes später wiederhergestellt beziehungsweise neu aufgebaut werden mussten. Wann das geschah, wer die Arbeit ausführte und wie viel der ursprünglichen Oberfläche erhalten blieb, ist nicht dokumentiert. Deshalb wäre auch die Bezeichnung „Originallack“ für den heutigen Gesamtzustand zu pauschal.</p>
+
+      <p>Gerade darin liegt der besondere Charakter des Instruments. Sein heutiger goldbrauner Ton ist keine unberührte Zeitkapsel. Er ist das Ergebnis aus ursprünglicher Arbeit, extremer Belastung, jahrzehntelangem Gebrauch und späterer handwerklicher Rettung. Der neue Lack hat die Geschichte nicht ausgelöscht – er hat dafür gesorgt, dass sie weitergehen konnte.</p>
+    </div>
+
+    <figure class="story-gallery story-gallery-landscape">
+      <img src="/images/stories/albert-volkmann-1908/scroll-960.webp" alt="Schnecke und Mechanik des Albert-Volkmann-Kontrabasses" width="960" height="799" loading="lazy" decoding="async" />
+      <figcaption>Die Schnecke: handwerkliches Detail eines Basses, der mehr als 115 Jahre bewahrt wurde.</figcaption>
+    </figure>
+
+    <div class="story-body">
+      <section class="story-evidence" aria-labelledby="evidence-title">
+        <p class="story-section-label">Transparente Einordnung</p>
+        <h2 id="evidence-title">Was wir wissen – und was überliefert ist</h2>
+        <div class="story-evidence-grid">
+          <div>
+            <h3>Am Instrument und in Quellen nachvollziehbar</h3>
+            <ul>
+              <li>Der Bass wird Albert Volkmann, Schönbach, und dem Jahr 1908 zugeordnet.</li>
+              <li>Volkmann ist für diese Zeit als Kontrabassbauer in Schönbach dokumentiert.</li>
+              <li>Der heutige Zustand und die Spuren der Oberfläche sind fotografisch festgehalten.</li>
+              <li>Vergleichsinstrumente zeigen verwandte Merkmale wie ein Monogramm am oberen Rückenteil.</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Aus dem Vorbesitz überliefert</h3>
+            <ul>
+              <li>Der Bass gehörte einem Berufsmusiker in Essen.</li>
+              <li>Er geriet während des Zweiten Weltkriegs in ein Feuer beziehungsweise starke Hitze.</li>
+              <li>Die Oberfläche wurde dadurch schwer verändert.</li>
+              <li>Der Lack musste später teilweise wiederhergestellt oder neu aufgebaut werden.</li>
+            </ul>
+          </div>
+        </div>
+        <p class="story-open-question"><strong>Offen bleiben:</strong> Name des Musikers, Gebäude und Datum des Brandes sowie Zeitpunkt, Umfang und Ausführender der Lackrestaurierung.</p>
+      </section>
+
+      <h2>Mehr als die Summe seiner Originalteile</h2>
+      <p>Bei historischen Instrumenten wird gern gefragt, was noch „original“ sei. Die Frage ist wichtig, aber nicht die einzige. Ein Instrument kann repariert, verändert und neu lackiert worden sein – und trotzdem als klangliches Werkzeug, handwerkliches Zeugnis und Träger einer Biografie bedeutend bleiben.</p>
+
+      <p>Der Volkmann-Bass von 1908 erzählt keine makellose Geschichte. Er erzählt eine bessere: von professionellem Gebrauch, von Verlust, von einer nicht mehr vollständig rekonstruierbaren Rettung und von der Entscheidung, ein beschädigtes Instrument nicht aufzugeben.</p>
+
+      <div class="story-cta">
+        <div>
+          <strong>Besitzen Sie einen Kontrabass mit unbekannter Geschichte?</strong>
+          <span>Zeigen Sie zuerst das ganze Instrument, Stempel, Zettel, Reparaturen und vorhandene Unterlagen.</span>
+        </div>
+        <a class="button primary" href="/instrument-verkaufen/?type=double_bass">Kontrabass zeigen</a>
+      </div>
+
+      <section class="story-sources" aria-labelledby="sources-title">
+        <h2 id="sources-title">Quellen und Einordnung</h2>
+        <p>Die Angaben zu Essener Besitzer, Brand und Lackwiederherstellung beruhen auf der mündlichen Überlieferung zum Instrument. Die historischen und instrumentenkundlichen Hintergründe wurden mit folgenden öffentlich zugänglichen Quellen abgeglichen:</p>
+        <ul>
+          <li><a href="https://www.mcmi.cz/databaze?type=vyrobci" target="_blank" rel="noopener noreferrer">MCMI / Tschechisches Nationalmuseum: Herstellerdatenbank</a></li>
+          <li><a href="https://www.ricercare.com/research/library/references/dictionary/v_contents.html" target="_blank" rel="noopener noreferrer">Violin &amp; Bow Makers Dictionary: Albert Volkmann</a></li>
+          <li><a href="https://auctions.gardinerhoulgate.co.uk/catalogue/lot/9f26867ef1108820a85836fe41d20273/63b778f7668dabe928d3800924a99077/musical-instruments-lot-2519/" target="_blank" rel="noopener noreferrer">Dokumentierter Vergleichsbass Albert Volkmann, um 1910</a></li>
+          <li><a href="https://geschichte.essen.de/historischesportal_zeiten/1934_bis_1945/chronik_1934_bis_1945.de.html" target="_blank" rel="noopener noreferrer">Stadt Essen: Chronik 1934 bis 1945</a></li>
+          <li><a href="https://www.gve-essen.de/facility-management/philharmonie-essen/" target="_blank" rel="noopener noreferrer">Gebäudemanagement der Stadt Essen: Geschichte von Saalbau und Philharmonie</a></li>
+          <li><a href="https://www.raf.mod.uk/what-we-do/our-history/air-historical-branch/ahb-despatches-and-reports/bomber-cmd-qtrly-rev-no4-jan-mar-1943/" target="_blank" rel="noopener noreferrer">Historischer Bericht zum Luftangriff vom 5./6. März 1943</a></li>
+          <li><a href="https://www.canada.ca/en/conservation-institute/services/preventive-conservation/guidelines-collections/paintings.html" target="_blank" rel="noopener noreferrer">Canadian Conservation Institute: Auswirkungen von Feuer, Hitze und Rauch auf Lackschichten</a></li>
+        </ul>
+      </section>
+
+      <nav class="related-topics" aria-label="Verwandte Themen">
+        <strong>Passende Informationen</strong>
+        <a href="/kontrabass-verkaufen/">Kontrabass verkaufen</a>
+        <a href="/instrument-geerbt/">Instrument oder Sammlung geerbt</a>
+        <a href="/essen/">Instrument aus Essen anbieten</a>
+      </nav>
+    </div>
+  </article>
+</BaseLayout>
+
+<style>
+  .story-page {
+    background: #f7f6f2;
+  }
+  .story-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr);
+    min-height: 760px;
+    background: #211d18;
+    color: #f8f3e9;
+  }
+  .story-hero-copy {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: clamp(70px, 9vw, 145px);
+  }
+  .story-kicker,
+  .story-section-label {
+    margin: 0 0 15px;
+    color: #a87334;
+    font-family: Arial, sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .story-kicker {
+    color: #d6b989;
+  }
+  .story-hero h1 {
+    max-width: 850px;
+    margin: 0 0 30px;
+    font-size: clamp(52px, 7.4vw, 104px);
+    font-weight: 400;
+    line-height: 0.96;
+  }
+  .story-deck {
+    max-width: 780px;
+    margin: 0;
+    color: #d8d1c6;
+    font-size: clamp(19px, 2vw, 24px);
+  }
+  .story-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 30px;
+    margin-top: 40px;
+    padding-top: 24px;
+    border-top: 1px solid rgba(255, 255, 255, 0.18);
+    color: #c9c1b6;
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+  }
+  .story-meta strong {
+    margin-right: 6px;
+    color: #fff;
+  }
+  .story-hero-media {
+    display: block;
+    min-height: 760px;
+    overflow: hidden;
+  }
+  .story-hero-media img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 43%;
+  }
+  .story-body {
+    max-width: 820px;
+    margin: auto;
+    padding: 88px 24px 0;
+  }
+  .story-body > p {
+    font-size: 19px;
+  }
+  .story-prologue {
+    margin-top: 0;
+    color: #3f3b35;
+    font-size: clamp(25px, 3vw, 34px) !important;
+    line-height: 1.35;
+  }
+  .story-prologue::first-letter {
+    float: left;
+    margin: 6px 10px 0 0;
+    color: #8e5b22;
+    font-size: 78px;
+    line-height: 0.72;
+  }
+  .story-body h2 {
+    margin: 0 0 24px;
+    font-size: clamp(36px, 5vw, 58px);
+    font-weight: 400;
+    line-height: 1.08;
+  }
+  .story-body .story-section-label {
+    margin-top: 70px;
+  }
+  .story-gallery {
+    margin: 90px auto 0;
+  }
+  .story-gallery figure,
+  figure.story-gallery {
+    margin-bottom: 0;
+  }
+  .story-gallery img {
+    display: block;
+    width: 100%;
+    background: #e5e0d6;
+  }
+  .story-gallery figcaption {
+    padding: 14px 2px 0;
+    color: #6c655c;
+    font-family: Arial, sans-serif;
+    font-size: 12px;
+  }
+  .story-gallery-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    max-width: 1120px;
+    padding: 0 24px;
+  }
+  .story-gallery-pair figure {
+    margin: 0;
+  }
+  .story-gallery-pair img {
+    aspect-ratio: 0.64;
+    object-fit: cover;
+  }
+  .story-gallery-wide {
+    max-width: 850px;
+    padding: 0 24px;
+  }
+  .story-gallery-wide img {
+    max-height: 760px;
+    object-fit: cover;
+    object-position: center 55%;
+  }
+  .story-gallery-landscape {
+    max-width: 1080px;
+    padding: 0 24px;
+  }
+  .story-pullquote {
+    margin: 72px -85px;
+    padding: 10px 0 10px 34px;
+    border-left: 4px solid #a87334;
+    color: #44382d;
+    font-size: clamp(34px, 5vw, 58px);
+    line-height: 1.12;
+  }
+  .story-respect-note {
+    margin: 45px 0;
+    padding: 26px 28px;
+    border: 1px solid #d8d2c8;
+    background: #ece9e2;
+  }
+  .story-respect-note strong {
+    font-size: 19px;
+  }
+  .story-respect-note p {
+    margin: 7px 0 0;
+    color: #5d574f;
+  }
+  .story-vignette {
+    margin: 48px -55px;
+    padding: 42px 55px;
+    border-top: 1px solid #b89970;
+    border-bottom: 1px solid #b89970;
+    background: #eee8dd;
+  }
+  .story-vignette .story-vignette-label {
+    margin: 0 0 14px;
+    color: #7a4b1c;
+    font-family: Arial, sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .story-vignette p:last-child {
+    margin: 0;
+    color: #41382f;
+    font-size: clamp(22px, 2.7vw, 29px);
+    font-style: italic;
+    line-height: 1.45;
+  }
+  .story-evidence {
+    margin: 5px -115px 80px;
+    padding: clamp(28px, 5vw, 54px);
+    background: #27231e;
+    color: #f6f1e7;
+  }
+  .story-evidence .story-section-label {
+    margin-top: 0;
+    color: #d6b989;
+  }
+  .story-evidence h2 {
+    max-width: 720px;
+  }
+  .story-evidence-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 45px;
+    margin-top: 40px;
+  }
+  .story-evidence h3 {
+    margin: 0 0 14px;
+    color: #e4c99d;
+    font-size: 19px;
+    font-weight: 400;
+  }
+  .story-evidence ul {
+    margin: 0;
+    padding-left: 20px;
+    color: #d8d1c6;
+  }
+  .story-evidence li + li {
+    margin-top: 9px;
+  }
+  .story-open-question {
+    margin: 35px 0 0;
+    padding-top: 25px;
+    border-top: 1px solid rgba(255, 255, 255, 0.16);
+    color: #c6beb2;
+  }
+  .story-cta {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 28px;
+    align-items: center;
+    margin: 65px 0;
+    padding: 28px 30px;
+    background: #80501f;
+    color: #fff;
+  }
+  .story-cta div {
+    display: grid;
+    gap: 3px;
+  }
+  .story-cta strong {
+    font-size: 19px;
+  }
+  .story-cta span {
+    color: #f1dfca;
+  }
+  .story-cta .button {
+    margin: 0;
+    white-space: nowrap;
+  }
+  .story-sources {
+    margin-top: 90px;
+    padding-top: 32px;
+    border-top: 1px solid #d7d2c8;
+    color: #5d574f;
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+  }
+  .story-sources h2 {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 34px;
+  }
+  .story-sources li + li {
+    margin-top: 8px;
+  }
+  .story-sources a {
+    color: #6c421c;
+  }
+  .story-body > .related-topics {
+    margin-bottom: 120px;
+  }
+  @media (max-width: 860px) {
+    .story-hero {
+      grid-template-columns: 1fr;
+    }
+    .story-hero-copy {
+      padding: 72px 24px 60px;
+    }
+    .story-hero-media {
+      min-height: 620px;
+      max-height: 780px;
+    }
+    .story-gallery-pair,
+    .story-evidence-grid,
+    .story-cta {
+      grid-template-columns: 1fr;
+    }
+    .story-pullquote,
+    .story-vignette,
+    .story-evidence {
+      margin-right: 0;
+      margin-left: 0;
+    }
+    .story-vignette {
+      padding: 32px 24px;
+    }
+    .story-cta .button {
+      justify-self: start;
+      white-space: normal;
+    }
+  }
+</style>

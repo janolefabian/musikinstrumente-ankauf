@@ -6,9 +6,13 @@ const {
   title = site.name,
   description = 'Musikinstrumente unkompliziert anbieten. Fotos senden, Anfrage persönlich prüfen lassen.',
   canonical,
-  robots
+  robots,
+  image,
+  ogType = 'website',
+  structuredData
 } = Astro.props;
 const canonicalUrl = canonical ? new URL(canonical, Astro.site) : Astro.url;
+const socialImageUrl = image ? new URL(image, Astro.site) : undefined;
 const organization = {
   '@context': 'https://schema.org',
   '@type': 'Organization',
@@ -36,16 +40,20 @@ const organization = {
     <meta name="description" content={description} />
     <link rel="canonical" href={canonicalUrl} />
     {robots ? <meta name="robots" content={robots} /> : null}
-    <meta property="og:type" content="website" />
+    <meta property="og:type" content={ogType} />
     <meta property="og:locale" content="de_DE" />
     <meta property="og:site_name" content={site.name} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonicalUrl} />
-    <meta name="twitter:card" content="summary" />
+    {socialImageUrl ? <meta property="og:image" content={socialImageUrl} /> : null}
+    {socialImageUrl ? <meta property="og:image:alt" content={title} /> : null}
+    <meta name="twitter:card" content={socialImageUrl ? 'summary_large_image' : 'summary'} />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
+    {socialImageUrl ? <meta name="twitter:image" content={socialImageUrl} /> : null}
     <script type="application/ld+json" set:html={JSON.stringify(organization)}></script>
+    {structuredData ? <script type="application/ld+json" set:html={JSON.stringify(structuredData)}></script> : null}
     <link rel="icon" href="/favicon.ico" />
     <title>{title}</title>
   </head>
@@ -72,6 +80,7 @@ const organization = {
           <a href="/kontrabass-verkaufen/">Kontrabass verkaufen</a>
           <a href="/kontrabassbogen-verkaufen/">Kontrabassbogen verkaufen</a>
           <a href="/instrument-geerbt/">Instrument geerbt</a>
+          <a href="/instrumentengeschichten/albert-volkmann-1908/">Albert Volkmann 1908</a>
         </nav>
         <nav aria-label="Rechtliches">
           <a href="/impressum/">Impressum</a>

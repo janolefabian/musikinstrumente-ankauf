@@ -1,0 +1,83 @@
+<section class="featured-story" aria-labelledby="featured-story-title">
+  <div class="featured-story-inner">
+    <picture>
+      <source
+        type="image/webp"
+        srcset="/images/stories/albert-volkmann-1908/front-three-quarter-640.webp 640w, /images/stories/albert-volkmann-1908/front-three-quarter-1200.webp 1200w"
+        sizes="(max-width: 800px) 100vw, 48vw"
+      />
+      <img
+        src="/images/stories/albert-volkmann-1908/front-three-quarter-1200.webp"
+        alt="Albert-Volkmann-Kontrabass von 1908 in schräger Vorderansicht"
+        width="1200"
+        height="1941"
+        loading="lazy"
+        decoding="async"
+      />
+    </picture>
+    <div class="featured-story-copy">
+      <p class="eyebrow">Instrumentengeschichte · Schönbach 1908</p>
+      <h2 id="featured-story-title">Der Bass, der die Hitze überstand.</h2>
+      <p>Ein Albert Volkmann, ein Berufsmusiker in Essen und die überlieferte Erinnerung an einen Kriegsbrand: Dieser Kontrabass trägt mehr als ein Jahrhundert nicht nur im Holz, sondern auch in seinem veränderten Lack.</p>
+      <a class="button secondary" href="/instrumentengeschichten/albert-volkmann-1908/">Die ganze Geschichte lesen</a>
+    </div>
+  </div>
+</section>
+
+<style>
+  .featured-story {
+    padding: 90px clamp(20px, 6vw, 90px);
+    background: #23201c;
+    color: #f8f3e9;
+  }
+  .featured-story-inner {
+    display: grid;
+    grid-template-columns: minmax(280px, 0.85fr) minmax(0, 1.15fr);
+    max-width: 1160px;
+    margin: auto;
+    align-items: center;
+  }
+  .featured-story picture {
+    display: block;
+    height: min(72vh, 650px);
+    overflow: hidden;
+  }
+  .featured-story img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 42%;
+  }
+  .featured-story-copy {
+    padding: clamp(38px, 7vw, 92px);
+  }
+  .featured-story .eyebrow {
+    color: #d6b989;
+  }
+  .featured-story h2 {
+    margin: 0 0 24px;
+    font-size: clamp(38px, 5vw, 64px);
+    font-weight: 400;
+    line-height: 1.04;
+  }
+  .featured-story p:not(.eyebrow) {
+    color: #d8d1c6;
+    font-size: 19px;
+  }
+  .featured-story .secondary {
+    border-color: #d6b989;
+    color: #fff;
+  }
+  @media (max-width: 800px) {
+    .featured-story-inner {
+      grid-template-columns: 1fr;
+    }
+    .featured-story picture {
+      height: 520px;
+    }
+    .featured-story-copy {
+      padding: 42px 8px 10px;
+    }
+  }
+</style>
