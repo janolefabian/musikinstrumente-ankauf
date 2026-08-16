@@ -3,7 +3,7 @@
     <header>
       <p class="eyebrow">Instrumentengeschichten</p>
       <h2 id="featured-stories-title">Was Instrumente bewahren.</h2>
-      <p>Werkstattzettel, Gebrauchsspuren und Erinnerungen machen aus einem Instrument mehr als Holz und Lack. Zwei Geschichten über Bässe, die beinahe verloren gewesen wären.</p>
+      <p>Werkstattzettel, Stempel, Gebrauchsspuren und Erinnerungen machen aus Instrumenten und Bögen mehr als Holz und Lack. Drei Geschichten über musikalische Lebenswege, die beinahe verloren gewesen wären.</p>
     </header>
 
     <div class="featured-stories-grid">
@@ -52,6 +52,30 @@
           <h3>Der Bass aus der stillen Wohnung.</h3>
           <p>Ein Berliner Wohnungsfund, eine aufwendige Reparatur und ein rätselhafter Zeitungsausschnitt von 1982.</p>
           <a href="/instrumentengeschichten/johannes-rubner-1967/">Geschichte lesen</a>
+        </div>
+      </article>
+
+      <article class="featured-story-card featured-story-card-wide">
+        <picture>
+          <source
+            type="image/webp"
+            srcset="/images/stories/f-guenter-hoyer-kontrabassbogen/frog-stamp-960.webp 960w, /images/stories/f-guenter-hoyer-kontrabassbogen/frog-stamp-1600.webp 1600w"
+            sizes="(max-width: 1000px) 100vw, 56vw"
+          />
+          <img
+            src="/images/stories/f-guenter-hoyer-kontrabassbogen/frog-stamp-1600.webp"
+            alt="Kontrabassbogen von F. Günter Hoyer mit dem Stempel FGHM"
+            width="1600"
+            height="774"
+            loading="lazy"
+            decoding="async"
+          />
+        </picture>
+        <div class="featured-story-copy">
+          <p class="story-meta">Markneukirchen · um 1950</p>
+          <h3>Der Bogen aus der Hand eines Profis.</h3>
+          <p>Ein FGHM-Kontrabassbogen von Freimut Günter Hoyer, bewahrt von der Enkelin seines früheren Besitzers.</p>
+          <a href="/instrumentengeschichten/f-guenter-hoyer-kontrabassbogen-um-1950/">Geschichte lesen</a>
         </div>
       </article>
     </div>
@@ -115,6 +139,17 @@
     object-fit: cover;
     object-position: center 42%;
   }
+  .featured-story-card-wide {
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1.35fr) minmax(330px, 0.65fr);
+    min-height: 390px;
+  }
+  .featured-story-card-wide picture {
+    min-height: 390px;
+  }
+  .featured-story-card-wide img {
+    object-position: center;
+  }
   .featured-story-copy {
     display: flex;
     flex-direction: column;
@@ -156,6 +191,9 @@
       grid-template-columns: 1fr;
     }
     .featured-story-card {
+      grid-template-columns: minmax(220px, 0.75fr) minmax(0, 1.25fr);
+    }
+    .featured-story-card-wide {
       grid-template-columns: minmax(220px, 0.75fr) minmax(0, 1.25fr);
     }
   }
