@@ -1,0 +1,490 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { site } from '../../config/site';
+
+const title = 'August-Rau-Geigenbogen um 1910 – aus Berliner Musikerhand';
+const description = 'Die Geschichte eines neusilbermontierten Geigenbogens von August Rau, der heute einem Berliner Geigenlehrer gehört und noch nicht verkauft wurde.';
+const canonical = '/instrumentengeschichten/august-rau-geigenbogen-um-1910/';
+const articleUrl = new URL(canonical, site.url).toString();
+const articleImage = new URL('/images/stories/august-rau-geigenbogen/frog-stamp-1600.webp', site.url).toString();
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'Article',
+  headline: title,
+  description,
+  image: articleImage,
+  datePublished: '2026-08-17',
+  dateModified: '2026-08-17',
+  inLanguage: 'de-DE',
+  mainEntityOfPage: articleUrl,
+  author: {
+    '@type': 'Organization',
+    name: site.name,
+    url: site.url
+  },
+  publisher: {
+    '@type': 'Organization',
+    name: site.name,
+    url: site.url
+  },
+  about: [
+    { '@type': 'Thing', name: 'Heinrich August Rau' },
+    { '@type': 'Thing', name: 'Geigenbogen' },
+    { '@type': 'Thing', name: 'Bogenbau in Markneukirchen' }
+  ]
+};
+---
+
+<BaseLayout
+  title={title}
+  description={description}
+  canonical={canonical}
+  image="/images/stories/august-rau-geigenbogen/frog-stamp-1600.webp"
+  ogType="article"
+  structuredData={structuredData}
+>
+  <article class="story-page rau-story">
+    <header class="story-hero">
+      <div class="story-hero-copy">
+        <p class="story-kicker">Instrumentengeschichte · Markneukirchen um 1910</p>
+        <h1>Der Bogen, der noch bleibt</h1>
+        <p class="story-deck">Ein neusilbermontierter Geigenbogen von August Rau aus dem Besitz eines Berliner Geigenlehrers. Er wurde gezeigt und geprüft – aber noch nicht verkauft. Seine Geschichte ist deshalb keine Rückschau, sondern eine offene Entscheidung.</p>
+        <div class="story-meta" aria-label="Kurzdaten">
+          <span><strong>Bogenmacher</strong> August Rau</span>
+          <span><strong>Montierung</strong> Neusilber</span>
+          <span><strong>Ort heute</strong> Berlin</span>
+          <span class="status-badge">Noch beim Besitzer</span>
+        </div>
+      </div>
+      <picture class="story-hero-media">
+        <source
+          type="image/webp"
+          srcset="/images/stories/august-rau-geigenbogen/bow-1600.webp 1600w, /images/stories/august-rau-geigenbogen/bow-2400.webp 2400w"
+          sizes="100vw"
+        />
+        <img
+          src="/images/stories/august-rau-geigenbogen/bow-2400.webp"
+          alt="Geigenbogen von August Rau mit rötlich-brauner kantiger Stange"
+          width="2400"
+          height="586"
+          fetchpriority="high"
+        />
+      </picture>
+    </header>
+
+    <div class="story-body">
+      <p class="story-prologue">Ein Lehrer hört anders zu als sein Schüler. Er hört nicht nur den Ton, sondern auch den Weg dorthin: den Ansatz, den Druck, die Richtung der Hand. Zwischen all diesen kleinen Korrekturen liegt der Bogen – das feinste Werkzeug im Unterrichtsraum.</p>
+
+      <p>Dieser Geigenbogen gehört einem Geigenlehrer in Berlin. Er ist kein anonymer Fund aus einer aufgelösten Wohnung und kein bereits abgeschlossenes Ankaufskapitel. Der Besitzer hat ihn zur Einordnung gezeigt, doch verkauft wurde er bislang nicht. Der Bogen ist noch dort, wo über Haltung, Strich und Klang gesprochen wird.</p>
+
+      <p>Gerade das macht seine Geschichte besonders. Viele historische Gegenstände werden erst erzählt, nachdem sie den Besitzer gewechselt haben. Dieser Rau-Bogen steht noch vor dieser Schwelle. Seine Herkunft ist bekannt, seine Merkmale sind dokumentiert – nur die Entscheidung über seine Zukunft ist offen.</p>
+
+      <blockquote class="story-pullquote">Manche Instrumentengeschichten beginnen nicht mit einem Verkauf, sondern mit der Frage, ob man überhaupt loslassen möchte.</blockquote>
+    </div>
+
+    <figure class="story-gallery story-gallery-wide">
+      <picture>
+        <source type="image/webp" srcset="/images/stories/august-rau-geigenbogen/frog-stamp-960.webp 960w, /images/stories/august-rau-geigenbogen/frog-stamp-1600.webp 1600w" sizes="(max-width: 1000px) 100vw, 1120px" />
+        <img src="/images/stories/august-rau-geigenbogen/frog-stamp-1600.webp" alt="Stempel AUG. RAU über dem Ebenholzfrosch des Geigenbogens" width="1600" height="617" loading="lazy" decoding="async" />
+      </picture>
+      <figcaption>Der Stempel „AUG. RAU“ sitzt auf der Stange über dem Frosch und ist trotz jahrzehntelanger Nutzung deutlich lesbar.</figcaption>
+    </figure>
+
+    <div class="story-body">
+      <p class="story-section-label">Der Name auf der Stange</p>
+      <h2>Heinrich August Rau und die Blüte des deutschen Bogenbaus</h2>
+
+      <p>Heinrich August Rau wurde 1866 in Siebenbrunn bei Markneukirchen geboren. Das Bogenmacherhandwerk lernte er bei Franz Albert Nürnberger II., einem der prägenden Meister der deutschen Schule. Seine Gesellenjahre führten ihn anschließend nach Dresden in die renommierten Werkstätten von Richard Weichold und Johann Wilhelm Knopf.</p>
+
+      <p>1890 gründete Rau seine eigene Werkstatt. Während sich der Instrumentenbau zunehmend in arbeitsteilige Produktion verwandelte, hielt er an der selbstständigen handwerklichen Arbeit fest. Er entwickelte sich zu einem der anerkanntesten deutschen Bogenmacher seiner Zeit und bildete später selbst eine Reihe bedeutender Meister aus.</p>
+
+      <aside class="stamp-note">
+        <span>Die Datierung</span>
+        <strong>AUG. RAU · Markneukirchen · um 1910</strong>
+        <p>Das Musikinstrumenten-Museum Markneukirchen dokumentiert, dass Rau seine Bögen ungefähr ab 1910 mit dem eigenen Namen stempelte. Die Form des erhaltenen Stempels und die Bauweise führen diesen Bogen in die Jahre des frühen 20. Jahrhunderts.</p>
+      </aside>
+
+      <p>Der hier erhaltene Stempel lautet „AUG. RAU“. Zusammen mit der kantig gearbeiteten Stange, dem fein modellierten Kopf und dem Ebenholzfrosch ergibt sich das Bild eines charakteristischen Markneukirchener Geigenbogens aus Raus Werkstattzeit.</p>
+    </div>
+
+    <div class="story-gallery story-gallery-pair" aria-label="Kopf und Frosch des August-Rau-Geigenbogens">
+      <figure>
+        <img src="/images/stories/august-rau-geigenbogen/head-1600.webp" alt="Kopf des August-Rau-Geigenbogens mit heller Kopfplatte" width="1600" height="765" loading="lazy" decoding="async" />
+        <figcaption>Der Kopf: kräftig, klar geschnitten und mit einer hellen Platte sauber abgeschlossen.</figcaption>
+      </figure>
+      <figure>
+        <img src="/images/stories/august-rau-geigenbogen/frog-angle-1400.webp" alt="Ebenholzfrosch mit Perlmutt und Neusilbermontierung" width="1400" height="741" loading="lazy" decoding="async" />
+        <figcaption>Ebenholz, Perlmutt und Neusilber bilden einen zurückhaltenden, funktionalen Kontrast.</figcaption>
+      </figure>
+    </div>
+
+    <div class="story-body">
+      <p class="story-section-label">Neusilber statt Edelmetall</p>
+      <h2>Die Qualität eines Bogens steckt nicht allein in seiner Montierung</h2>
+
+      <p>Der Frosch dieses Bogens ist mit Neusilber montiert. Der Name ist ein wenig irreführend: Neusilber enthält kein Silber, sondern ist eine helle Legierung aus Kupfer, Nickel und Zink. Im Bogenbau ermöglichte das Material eine robuste, präzise Montierung, ohne den Preis einer echten Silberausstattung.</p>
+
+      <p>Eine Neusilbermontierung macht aus einem guten Bogen keinen einfachen Bogen. Entscheidend sind die Qualität und Elastizität der Stange, ihre Balance, die Ausarbeitung des Kopfes und die Genauigkeit des Frosches. August Rau fertigte Bögen in unterschiedlichen Ausstattungsstufen. Auch Auktionsarchive dokumentieren neusilbermontierte, oktagonale Geigenbögen mit Rau-Stempel.</p>
+
+      <p>Auf den Fotografien zeigt sich eine warme rötlich-braune Stange mit deutlich ausgeprägten Kanten. Der dunkle Ebenholzfrosch trägt ein rundes Perlmuttauge; an der Unterseite liegt ein breiter Perlmutschub. Die Metallteile haben über die Jahre eine leicht warme Patina angenommen. Das Leder am Griff zeigt Gebrauch – keine inszenierte Antiquität, sondern ein Werkzeug mit Vergangenheit.</p>
+
+      <p>Für einen Geigenlehrer ist genau diese Alltagstauglichkeit kein Nebenaspekt. Ein Unterrichtsbogen wird nicht nur in großen Gesten gespielt. Er demonstriert kurze Striche, springende Stricharten, leise Übergänge und immer wieder denselben Bewegungsablauf. Seine Qualität zeigt sich darin, dass er zuverlässig antwortet.</p>
+    </div>
+
+    <div class="story-body">
+      <p class="story-section-label">Der Berliner Unterrichtsraum</p>
+      <h2>Ein Bogen zwischen Erklären und Vormachen</h2>
+
+      <p>Der heutige Besitzer arbeitet als Geigenlehrer in Berlin. Damit befindet sich der Bogen nicht fern von der Musik, sondern mitten in ihrer täglichen Weitergabe. Unterricht ist selten spektakulär. Er besteht aus Wiederholung, Geduld und dem Augenblick, in dem eine Bewegung plötzlich selbstverständlich wird.</p>
+
+      <p>Vielleicht wurde der Rau-Bogen dabei als Hauptbogen gespielt, vielleicht als Vergleich oder als sorgfältig gehütete Alternative. Sicher ist: Ein historischer Bogen in Lehrerhand steht an einer besonderen Schnittstelle. Er verbindet die Werkstatterfahrung eines Markneukirchener Meisters mit der Erfahrung eines Musikers, der sein Wissen an die nächste Generation weitergibt.</p>
+
+      <p>Der mögliche Verkauf ist noch nicht abgeschlossen. Es gibt deshalb bislang weder einen neuen Besitzer noch eine Übergabe. Der Bogen bleibt vorerst bei dem Geigenlehrer – vollständig fotografiert, als August Rau erkannt und nun um seine historische Einordnung reicher.</p>
+
+      <section class="story-evidence" aria-labelledby="evidence-title">
+        <p class="story-section-label">Einordnung</p>
+        <h2 id="evidence-title">Was heute feststeht</h2>
+        <div class="story-evidence-grid">
+          <div>
+            <h3>Am Bogen sichtbar</h3>
+            <ul>
+              <li>Die Stange trägt den gut lesbaren Stempel „AUG. RAU“.</li>
+              <li>Der Bogen besitzt eine kantige rötlich-braune Stange.</li>
+              <li>Der Ebenholzfrosch ist mit Perlmutt und Neusilber ausgestattet.</li>
+              <li>Kopf, Frosch, Stempel und Gebrauchsspuren sind fotografisch dokumentiert.</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Zum heutigen Besitz</h3>
+            <ul>
+              <li>Der Bogen gehört einem Geigenlehrer in Berlin.</li>
+              <li>Er wurde zur Einordnung und möglichen Veräußerung gezeigt.</li>
+              <li>Ein Verkauf ist bislang nicht erfolgt.</li>
+              <li>Der Bogen befindet sich weiterhin bei seinem Besitzer.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <h2>Eine offene Geschichte ist trotzdem eine Geschichte</h2>
+      <p>Der Wert eines Bogens beginnt nicht erst mit seinem Verkauf. Dieser August Rau hat bereits mehr als ein Jahrhundert überdauert, trägt die Handschrift einer bedeutenden Werkstatt und befindet sich heute bei einem Musiker, dessen Beruf vom genauen Hinhören lebt.</p>
+
+      <p>Ob er eines Tages weitergegeben wird, entscheidet sein Besitzer. Bis dahin bleibt er, was er schon lange ist: ein feines Werkzeug, ein Stück Markneukirchener Handwerksgeschichte und ein stiller Begleiter des Berliner Musiklebens.</p>
+
+      <div class="story-cta">
+        <div>
+          <strong>Sie möchten einen Bogen zunächst nur einordnen lassen?</strong>
+          <span>Ein Foto verpflichtet zu keinem Verkauf. Zeigen Sie Gesamtansicht, Kopf, Frosch und Stempel – die Entscheidung bleibt bei Ihnen.</span>
+        </div>
+        <a class="button primary" href="/instrument-verkaufen/?type=bow">Bogen unverbindlich zeigen</a>
+      </div>
+
+      <section class="story-sources" aria-labelledby="sources-title">
+        <h2 id="sources-title">Quellen und Einordnung</h2>
+        <p>Die Angaben zum heutigen Besitzer und zum noch nicht erfolgten Verkauf stammen aus der Geschichte des Bogens. Bauweise und Stempel sind fotografisch dokumentiert. Für Biografie und zeitliche Einordnung wurden folgende Quellen herangezogen:</p>
+        <ul>
+          <li><a href="https://museum-markneukirchen.de/das-museum/portrait/aktuelles-/-berichte" target="_blank" rel="noopener noreferrer">Musikinstrumenten-Museum Markneukirchen: Forschung zu Heinrich August Rau</a></li>
+          <li><a href="https://www.thestrad.com/lutherie/august-rau-the-old-fashioned-way/14734.article" target="_blank" rel="noopener noreferrer">The Strad: „August Rau – The old-fashioned way“</a></li>
+          <li><a href="https://www.bibb.de/dienst/publikationen/de/download/8599" target="_blank" rel="noopener noreferrer">Bundesinstitut für Berufsbildung: Geschichte des Bogenmacherhandwerks in Markneukirchen</a></li>
+          <li><a href="https://amati.com/maker/rau-august-/" target="_blank" rel="noopener noreferrer">Amati: August Rau – Biografie und dokumentierte Auktionsbögen</a></li>
+          <li><a href="https://bowsviolins.fi/product/august-rau/" target="_blank" rel="noopener noreferrer">Dokumentierter August-Rau-Vergleichsbogen mit frühem Stempel</a></li>
+        </ul>
+      </section>
+
+      <nav class="related-topics" aria-label="Verwandte Themen">
+        <strong>Passende Informationen</strong>
+        <a href="/bogen-verkaufen/">Geigenbogen verkaufen</a>
+        <a href="/instrumentengeschichten/f-guenter-hoyer-kontrabassbogen-um-1950/">Instrumentengeschichte: F. Günter Hoyer um 1950</a>
+        <a href="/instrument-geerbt/">Instrument oder Bogen geerbt</a>
+        <a href="/berlin/">Instrument aus Berlin anbieten</a>
+      </nav>
+    </div>
+  </article>
+</BaseLayout>
+
+<style>
+  .story-page {
+    background: #f7f5ef;
+  }
+  .story-hero {
+    background: #202321;
+    color: #f9f4e9;
+  }
+  .story-hero-copy {
+    max-width: 1120px;
+    margin: auto;
+    padding: clamp(78px, 10vw, 145px) 24px 52px;
+  }
+  .story-kicker,
+  .story-section-label {
+    margin: 0 0 15px;
+    color: #8d5d31;
+    font-family: Arial, sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .story-kicker {
+    color: #d5b278;
+  }
+  .story-hero h1 {
+    max-width: 980px;
+    margin: 0 0 30px;
+    font-size: clamp(52px, 8vw, 108px);
+    font-weight: 400;
+    line-height: 0.95;
+  }
+  .story-deck {
+    max-width: 850px;
+    margin: 0;
+    color: #d4d3cb;
+    font-size: clamp(19px, 2vw, 24px);
+  }
+  .story-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 24px;
+    align-items: center;
+    margin-top: 40px;
+    padding-top: 24px;
+    border-top: 1px solid rgba(255, 255, 255, 0.18);
+    color: #c6c8c1;
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+  }
+  .story-meta strong {
+    margin-right: 6px;
+    color: #fff;
+  }
+  .status-badge {
+    padding: 6px 10px;
+    border: 1px solid #c4a36d;
+    border-radius: 999px;
+    color: #ead0a2;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .story-hero-media {
+    display: block;
+    padding: 24px clamp(24px, 6vw, 90px) 58px;
+    overflow: hidden;
+  }
+  .story-hero-media img {
+    display: block;
+    width: 100%;
+    height: auto;
+    filter: drop-shadow(0 22px 28px rgba(0, 0, 0, 0.3));
+  }
+  .story-body {
+    max-width: 820px;
+    margin: auto;
+    padding: 88px 24px 0;
+  }
+  .story-body > p {
+    font-size: 19px;
+  }
+  .story-prologue {
+    margin-top: 0;
+    color: #3e3b35;
+    font-size: clamp(25px, 3vw, 34px) !important;
+    line-height: 1.35;
+  }
+  .story-prologue::first-letter {
+    float: left;
+    margin: 6px 10px 0 0;
+    color: #86502b;
+    font-size: 78px;
+    line-height: 0.72;
+  }
+  .story-body h2 {
+    margin: 0 0 24px;
+    font-size: clamp(36px, 5vw, 58px);
+    font-weight: 400;
+    line-height: 1.08;
+  }
+  .story-body .story-section-label {
+    margin-top: 70px;
+  }
+  .story-gallery {
+    margin: 90px auto 0;
+  }
+  .story-gallery figure,
+  figure.story-gallery {
+    margin-bottom: 0;
+  }
+  .story-gallery img {
+    display: block;
+    width: 100%;
+    background: #e5e2d9;
+  }
+  .story-gallery figcaption {
+    padding: 14px 2px 0;
+    color: #69645b;
+    font-family: Arial, sans-serif;
+    font-size: 12px;
+  }
+  .story-gallery-wide {
+    max-width: 1120px;
+    padding: 0 24px;
+  }
+  .story-gallery-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    max-width: 1120px;
+    padding: 0 24px;
+  }
+  .story-gallery-pair figure {
+    margin: 0;
+  }
+  .story-gallery-pair img {
+    aspect-ratio: 16 / 10;
+    object-fit: cover;
+  }
+  .story-gallery-landscape {
+    max-width: 960px;
+    padding: 0 24px;
+  }
+  .story-pullquote {
+    margin: 72px -85px;
+    padding: 10px 0 10px 34px;
+    border-left: 4px solid #8d5d31;
+    color: #443a2e;
+    font-size: clamp(34px, 5vw, 58px);
+    line-height: 1.12;
+  }
+  .stamp-note {
+    display: grid;
+    gap: 9px;
+    margin: 38px 0;
+    padding: 26px 30px;
+    border-top: 1px solid #afa084;
+    border-bottom: 1px solid #afa084;
+    background: #ece5d3;
+  }
+  .stamp-note span {
+    color: #746b5b;
+    font-family: Arial, sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .stamp-note strong {
+    color: #302d27;
+    font-size: clamp(25px, 4vw, 36px);
+    font-weight: 400;
+    line-height: 1.15;
+  }
+  .stamp-note p {
+    margin: 0;
+    color: #5f5a51;
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+  }
+  .story-evidence {
+    margin: 90px -115px 80px;
+    padding: clamp(28px, 5vw, 54px);
+    background: #272927;
+    color: #f5f1e7;
+  }
+  .story-evidence .story-section-label {
+    margin-top: 0;
+    color: #d5b278;
+  }
+  .story-evidence-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 45px;
+    margin-top: 40px;
+  }
+  .story-evidence h3 {
+    margin: 0 0 14px;
+    color: #dfc28e;
+    font-size: 19px;
+    font-weight: 400;
+  }
+  .story-evidence ul {
+    margin: 0;
+    padding-left: 20px;
+    color: #d4d5cf;
+  }
+  .story-evidence li + li {
+    margin-top: 9px;
+  }
+  .story-cta {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 28px;
+    align-items: center;
+    margin: 65px 0;
+    padding: 28px 30px;
+    background: #76502e;
+    color: #fff;
+  }
+  .story-cta div {
+    display: grid;
+    gap: 3px;
+  }
+  .story-cta strong {
+    font-size: 19px;
+  }
+  .story-cta span {
+    color: #efe1d0;
+  }
+  .story-cta .button {
+    margin: 0;
+    white-space: nowrap;
+  }
+  .story-sources {
+    margin-top: 90px;
+    padding-top: 32px;
+    border-top: 1px solid #d5d2ca;
+    color: #5c5952;
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+  }
+  .story-sources h2 {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 34px;
+  }
+  .story-sources li + li {
+    margin-top: 8px;
+  }
+  .story-sources a {
+    color: #674525;
+  }
+  .story-body > .related-topics {
+    margin-bottom: 120px;
+  }
+  @media (max-width: 1000px) {
+    .story-evidence {
+      margin-right: 0;
+      margin-left: 0;
+    }
+  }
+  @media (max-width: 760px) {
+    .story-hero-copy {
+      padding: 72px 24px 42px;
+    }
+    .story-hero-media {
+      padding: 20px 12px 42px;
+    }
+    .story-gallery-pair,
+    .story-evidence-grid,
+    .story-cta {
+      grid-template-columns: 1fr;
+    }
+    .story-pullquote {
+      margin-right: 0;
+      margin-left: 0;
+    }
+    .story-cta .button {
+      justify-self: start;
+      white-space: normal;
+    }
+  }
+</style>
