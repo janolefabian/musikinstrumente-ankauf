@@ -1,4 +1,24 @@
-export const cities = [
+export type City = {
+  slug: string;
+  name: string;
+  region: string;
+  areas: string[];
+  intro: string;
+  regionalNote: string;
+  planningNote: string;
+  seoTitle?: string;
+  seoDescription?: string;
+  storyHrefs?: string[];
+  localGuide?: {
+    eyebrow: string;
+    title: string;
+    lead: string;
+    sections: Array<{ title: string; text: string }>;
+    faq?: { question: string; answer: string };
+  };
+};
+
+export const cities: City[] = [
   {
     slug: 'berlin',
     name: 'Berlin',
@@ -6,7 +26,36 @@ export const cities = [
     areas: ['Mitte', 'Pankow', 'Charlottenburg', 'Neukölln', 'Steglitz-Zehlendorf', 'Brandenburg'],
     intro: 'Unser Sitz ist in Berlin. Auch hier ist der einfachste erste Schritt eine Online-Anfrage: Sie zeigen das Instrument mit wenigen Fotos und vermeiden einen unnötigen Transport durch die Stadt.',
     regionalNote: 'Ob das Instrument in einer Berliner Wohnung, einem Proberaum oder im Umland steht, ist für die erste Prüfung nicht entscheidend. Wichtig sind eine Gesamtansicht, erkennbare Details und alles, was zum Instrument gehört.',
-    planningNote: 'Nach der persönlichen Sichtung lässt sich gezielt besprechen, welcher nächste Schritt in Berlin sinnvoll ist.'
+    planningNote: 'Nach der persönlichen Sichtung lässt sich gezielt besprechen, welcher nächste Schritt in Berlin sinnvoll ist.',
+    seoTitle: 'Musikinstrumente Ankauf Berlin – Instrument verkaufen',
+    seoDescription: 'Musikinstrument in Berlin verkaufen: Geige, Cello, Kontrabass, Bogen oder Nachlass zuerst per Foto zeigen und persönlich prüfen lassen.',
+    storyHrefs: [
+      '/instrumentengeschichten/johannes-rubner-1967/',
+      '/instrumentengeschichten/august-rau-geigenbogen-um-1910/'
+    ],
+    localGuide: {
+      eyebrow: 'Sitz in Berlin',
+      title: 'Ein Instrument muss für den ersten Eindruck nicht durch die Stadt.',
+      lead: 'Berlin ist unser tatsächlicher Sitz – dennoch beginnt auch eine Berliner Anfrage bewusst online. So bleibt das Instrument zunächst dort, wo es sicher steht, und eine Übergabe wird erst vereinbart, wenn die Fotos eine sinnvolle Grundlage geschaffen haben.',
+      sections: [
+        {
+          title: 'Wohnung, Proberaum oder Keller',
+          text: 'Gerade Celli und Kontrabässe werden nicht selten in oberen Etagen, engen Altbauten oder Proberäumen aufbewahrt. Für die erste Prüfung ist es besser, das Instrument am Standort vollständig zu fotografieren, als es vorschnell durch Treppenhaus und Stadtverkehr zu bewegen.'
+        },
+        {
+          title: 'Berliner Nachlässe zusammenhalten',
+          text: 'Bei einer Wohnungsauflösung sollten Bögen, Koffer, Rechnungen und handschriftliche Notizen zunächst beim Instrument bleiben. Der Johannes-Rubner-Kontrabass auf dieser Seite wurde selbst bei einer Berliner Wohnungsauflösung gefunden und zeigt, wie wichtig solche Zusammenhänge sein können.'
+        },
+        {
+          title: 'Übergabe nur nach Abstimmung',
+          text: 'Die im Impressum genannte Anschrift ist keine unangemeldete Annahmestelle. Nach der persönlichen Foto-Prüfung besprechen wir, ob weitere Ansichten, eine Begutachtung oder eine vereinbarte Übergabe in Berlin der passende nächste Schritt sind.'
+        }
+      ],
+      faq: {
+        question: 'Kann ich ein Instrument direkt in Berlin vorbeibringen?',
+        answer: 'Bitte starten Sie zuerst mit der Online-Anfrage. Eine Übergabe oder Begutachtung in Berlin wird nur nach vorheriger Sichtung und persönlicher Terminabstimmung vereinbart.'
+      }
+    }
   },
   {
     slug: 'bremen',
@@ -60,7 +109,33 @@ export const cities = [
     areas: ['Stadtmitte', 'Rüttenscheid', 'Werden', 'Borbeck', 'Mülheim', 'Gelsenkirchen'],
     intro: 'Wer in Essen oder im mittleren Ruhrgebiet ein Instrument verkaufen möchte, kann den ersten Schritt bequem online erledigen. Einige übersichtliche Fotos reichen zum Start.',
     regionalNote: 'Gerade bei Instrumenten aus Familienbesitz ist oft nicht bekannt, ob Etiketten, Stempel oder alte Reparaturzettel wichtig sind. Fotografieren Sie solche Hinweise einfach mit – Sie müssen sie nicht selbst einordnen.',
-    planningNote: 'Nach der persönlichen Sichtung wird geklärt, welche Ergänzungen oder nächsten Schritte tatsächlich nötig sind.'
+    planningNote: 'Nach der persönlichen Sichtung wird geklärt, welche Ergänzungen oder nächsten Schritte tatsächlich nötig sind.',
+    seoTitle: 'Musikinstrumente Ankauf Essen – Instrument verkaufen',
+    seoDescription: 'Musikinstrument in Essen oder im Ruhrgebiet verkaufen: Fotos von Geige, Cello, Kontrabass, Bogen oder Nachlass senden und persönlich prüfen lassen.',
+    storyHrefs: ['/instrumentengeschichten/albert-volkmann-1908/'],
+    localGuide: {
+      eyebrow: 'Eine belegbare Verbindung zu Essen',
+      title: 'Ein historischer Kontrabass verbindet diese Seite tatsächlich mit der Stadt.',
+      lead: 'Der Albert-Volkmann-Kontrabass von 1908 befand sich nach der Überlieferung im Besitz eines Berufsmusikers in Essen. Seine Geschichte ist nicht bloß ein ausgetauschter Stadtname, sondern ein konkretes Beispiel dafür, welche Wege ein professionell gespieltes Instrument nehmen kann.',
+      sections: [
+        {
+          title: 'Musikerbesitz und Familiengeschichte',
+          text: 'Bei Instrumenten aus Essen und dem Ruhrgebiet treffen berufliche Nutzung, private Aufbewahrung und familiäre Überlieferung häufig aufeinander. Namen von Orchestern, alte Programme, Reparaturbelege oder ein handschriftlicher Hinweis können deshalb genauso wichtig sein wie der Werkstattzettel im Instrument.'
+        },
+        {
+          title: 'Große Instrumente zuerst am Standort zeigen',
+          text: 'Ein Kontrabass sollte für eine erste Einschätzung nicht zwischen Essen, Mülheim oder Gelsenkirchen transportiert werden. Fotografieren Sie Vorderseite, Rücken, Schnecke, Zettel, Lack und sichtbare Schäden dort, wo der Bass sicher aufgestellt werden kann.'
+        },
+        {
+          title: 'Überlieferung klar kennzeichnen',
+          text: 'Nicht jede Familiengeschichte lässt sich später beweisen. Schreiben Sie trotzdem auf, was erzählt wurde, und kennzeichnen Sie Unsicheres als Erinnerung. Beim Volkmann-Bass werden sichtbare Merkmale, historische Quellen und mündliche Überlieferung bewusst voneinander getrennt.'
+        }
+      ],
+      faq: {
+        question: 'Gibt es eine Annahmestelle in Essen?',
+        answer: 'Nein. Die erste Prüfung erfolgt online. Ob nach der Sichtung eine Begutachtung, Abholung oder andere Übergabe sinnvoll ist, wird persönlich für das konkrete Instrument abgestimmt.'
+      }
+    }
   },
   {
     slug: 'frankfurt',
@@ -78,7 +153,32 @@ export const cities = [
     areas: ['Altona', 'Eimsbüttel', 'Wandsbek', 'Harburg', 'Norderstedt', 'Lübeck'],
     intro: 'In Hamburg und dem Umland können Sie ein Instrument zunächst online anbieten. Damit entfällt für die erste Prüfung eine Fahrt quer durch die Stadt, über die Elbe oder aus der Metropolregion.',
     regionalNote: 'Bei großen Instrumenten oder kompletten Nachlässen ist ein vorschneller Transport besonders unpraktisch. Zeigen Sie deshalb zunächst alles am Standort – auch Koffer, Bögen und Papiere, die dazugehören könnten.',
-    planningNote: 'Ob später eine persönliche Begutachtung oder andere Übergabe sinnvoll ist, wird nach der Foto-Prüfung geklärt.'
+    planningNote: 'Ob später eine persönliche Begutachtung oder andere Übergabe sinnvoll ist, wird nach der Foto-Prüfung geklärt.',
+    seoTitle: 'Musikinstrumente Ankauf Hamburg – Instrument verkaufen',
+    seoDescription: 'Musikinstrument in Hamburg verkaufen: Geige, Cello, Kontrabass, Bogen oder Nachlass aus Hamburg und der Metropolregion per Foto anbieten.',
+    localGuide: {
+      eyebrow: 'Hamburg und die Metropolregion',
+      title: 'Erst dokumentieren, bevor ein großes Instrument durch Hamburg fährt.',
+      lead: 'Zwischen Altona, Wandsbek, Harburg und dem Umland können schon kurze Entfernungen einen aufwendigen Instrumententransport bedeuten. Die Foto-Anfrage trennt die notwendige Dokumentation von einer späteren Übergabe und verhindert unnötige Wege.',
+      sections: [
+        {
+          title: 'Kontrabass und Cello sicher fotografieren',
+          text: 'Stellen Sie große Instrumente nur dort auf, wo ausreichend Platz und ein sicherer Hintergrund vorhanden sind. Eine vollständige Vorder- und Rückansicht, der Kopf sowie erkennbare Zettel reichen zunächst aus. Für die Anfrage ist weder eine Fahrt über die Elbe noch in die Innenstadt notwendig.'
+        },
+        {
+          title: 'Anfragen aus dem Umland gehören dazu',
+          text: 'Auch Instrumente aus Norderstedt, Lübeck oder anderen Orten der Metropolregion beginnen mit demselben Online-Schritt. Der genaue Standort wird erst wichtig, wenn nach der persönlichen Sichtung ein sinnvoller weiterer Ablauf feststeht.'
+        },
+        {
+          title: 'Nachlass nicht vorschnell aufteilen',
+          text: 'Bei mehreren Instrumenten fotografieren Sie zuerst den gesamten Bestand. Bögen, Koffer und Unterlagen sollten nicht nach vermutetem Wert getrennt werden: Ein unscheinbarer Stempel oder eine alte Rechnung kann die Zuordnung später wesentlich erleichtern.'
+        }
+      ],
+      faq: {
+        question: 'Kann ich auch aus dem Hamburger Umland anfragen?',
+        answer: 'Ja. Der erste Schritt erfolgt vollständig online. Geben Sie Ihren Standort freiwillig mit an; eine mögliche Übergabe wird erst nach der Foto-Prüfung individuell geplant.'
+      }
+    }
   },
   {
     slug: 'hannover',
@@ -132,7 +232,32 @@ export const cities = [
     areas: ['Mitte', 'Bad Cannstatt', 'Degerloch', 'Vaihingen', 'Ludwigsburg', 'Esslingen'],
     intro: 'Ein Instrument aus Stuttgart, Ludwigsburg oder Esslingen können Sie zuerst online zeigen. Damit bleibt es für die erste Prüfung sicher am Standort und Sie sparen eine unnötige Fahrt.',
     regionalNote: 'In der Stuttgarter Region liegen Stadtteile und Nachbarstädte nah beieinander, der Transport eines Cellos oder Kontrabasses bleibt dennoch aufwendig. Fotos helfen, den tatsächlichen nächsten Schritt zuerst einzugrenzen.',
-    planningNote: 'Wie es danach weitergeht, wird persönlich, ohne pauschale Transportvorgabe und passend zum Instrument besprochen.'
+    planningNote: 'Wie es danach weitergeht, wird persönlich, ohne pauschale Transportvorgabe und passend zum Instrument besprochen.',
+    seoTitle: 'Musikinstrumente Ankauf Stuttgart – Instrument verkaufen',
+    seoDescription: 'Musikinstrument in Stuttgart, Ludwigsburg oder Esslingen verkaufen: Fotos senden und Geige, Cello, Kontrabass, Bogen oder Nachlass prüfen lassen.',
+    localGuide: {
+      eyebrow: 'Stuttgart und die Region',
+      title: 'Für die erste Prüfung entscheidet das Instrument – nicht der Anfahrtsweg.',
+      lead: 'Stuttgart, Ludwigsburg und Esslingen liegen eng beieinander, doch ein empfindliches oder großes Streichinstrument lässt sich nicht wie gewöhnliches Gepäck bewegen. Deshalb wird zuerst geklärt, was vorhanden ist und ob ein weiterer Termin überhaupt nötig wird.',
+      sections: [
+        {
+          title: 'Sicher am Standort beginnen',
+          text: 'Ein Cello oder Kontrabass darf für die Fotos in Wohnung, Musikzimmer oder Proberaum bleiben. Wichtig ist eine freie Gesamtansicht; enge Winkel oder schwierige Lichtverhältnisse können später mit einzelnen Detailaufnahmen ausgeglichen werden.'
+        },
+        {
+          title: 'Unterlagen aus Musikerbesitz mitzeigen',
+          text: 'In einer Region mit Orchestern, Musikschulen und langem privatem Musikleben gelangen Instrumente häufig zusammen mit Bögen, Koffern oder Reparaturbelegen in einen Nachlass. Fotografieren Sie diese Dinge gemeinsam, bevor Sie eine Zuordnung vornehmen.'
+        },
+        {
+          title: 'Ludwigsburg und Esslingen mitgedacht',
+          text: 'Die Anfrage ist nicht auf die Stuttgarter Stadtgrenze beschränkt. Für Instrumente aus Ludwigsburg, Esslingen und dem weiteren Umland gilt derselbe Ablauf: erst vollständig zeigen, dann nach der persönlichen Prüfung den passenden nächsten Schritt organisieren.'
+        }
+      ],
+      faq: {
+        question: 'Muss ich für die Prüfung nach Stuttgart fahren?',
+        answer: 'Nein. Fotos und vorhandene Informationen genügen für den ersten Schritt. Ob später eine Begutachtung oder Übergabe sinnvoll ist, wird erst danach individuell geklärt.'
+      }
+    }
   }
 ];
 

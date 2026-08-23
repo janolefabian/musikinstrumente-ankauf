@@ -9,8 +9,8 @@ export function getStaticPaths() {
 const { city } = Astro.props;
 ---
 <BaseLayout
-  title={`Instrument in ${city.name} verkaufen – Fotos senden`}
-  description={`Musikinstrument aus ${city.name} online anbieten: Fotos senden, Anfrage zwischenspeichern und persönlich prüfen lassen. Ohne Fachkenntnisse.`}
+  title={city.seoTitle || `Instrument in ${city.name} verkaufen – Fotos senden`}
+  description={city.seoDescription || `Musikinstrument aus ${city.name} online anbieten: Fotos senden, Anfrage zwischenspeichern und persönlich prüfen lassen. Ohne Fachkenntnisse.`}
   canonical={`/${city.slug}/`}
 >
   <CityContent city={city} />

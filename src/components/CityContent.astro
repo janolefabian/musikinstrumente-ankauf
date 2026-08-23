@@ -1,6 +1,9 @@
 ---
+import { stories } from '../data/stories';
+
 const { city } = Astro.props;
 const offerUrl = `/instrument-verkaufen/?city=${encodeURIComponent(city.name)}`;
+const cityStories = city.storyHrefs ? stories.filter((story) => city.storyHrefs.includes(story.href)) : [];
 ---
 
 <article class="city-page">
@@ -60,6 +63,47 @@ const offerUrl = `/instrument-verkaufen/?city=${encodeURIComponent(city.name)}`;
     </div>
   </section>
 
+  {city.localGuide && (
+    <section class="section city-local-guide" aria-labelledby="city-local-guide-title">
+      <div class="section-inner">
+        <div class="city-local-guide-header">
+          <p class="eyebrow">{city.localGuide.eyebrow}</p>
+          <h2 id="city-local-guide-title">{city.localGuide.title}</h2>
+          <p>{city.localGuide.lead}</p>
+        </div>
+        <div class="city-local-guide-grid">
+          {city.localGuide.sections.map((section) => (
+            <article>
+              <h3>{section.title}</h3>
+              <p>{section.text}</p>
+            </article>
+          ))}
+        </div>
+        {cityStories.length > 0 && (
+          <div class="city-story-panel">
+            <div class="city-story-panel-heading">
+              <p class="eyebrow">Instrumente mit Verbindung zur Region</p>
+              <h3>{cityStories.length === 1 ? 'Eine dokumentierte Geschichte aus diesem Umfeld.' : 'Dokumentierte Geschichten aus diesem Umfeld.'}</h3>
+            </div>
+            <div class="city-story-list">
+              {cityStories.map((story) => (
+                <a href={story.href} class="city-story-card">
+                  <img src={story.image} alt={story.alt} width={story.width} height={story.height} loading="lazy" decoding="async" />
+                  <span>
+                    <small>{story.meta}</small>
+                    <strong>{story.title}</strong>
+                    <span>{story.excerpt}</span>
+                  </span>
+                </a>
+              ))}
+            </div>
+            <a class="city-story-all" href="/instrumentengeschichten/">Alle Instrumentengeschichten</a>
+          </div>
+        )}
+      </div>
+    </section>
+  )}
+
   <section class="section city-photo-guide" aria-labelledby="city-photo-title">
     <div class="section-inner">
       <div class="city-section-heading">
@@ -89,6 +133,7 @@ const offerUrl = `/instrument-verkaufen/?city=${encodeURIComponent(city.name)}`;
         <a href="/bogen-verkaufen/"><strong>Bogen verkaufen</strong><span>Stempel, Frosch und Spitze fotografieren</span></a>
         <a href="/kontrabass-verkaufen/"><strong>Kontrabass verkaufen</strong><span>Erst Fotos senden, nicht vorschnell transportieren</span></a>
         <a href="/instrument-geerbt/"><strong>Instrument geerbt</strong><span>Nachlass oder Sammlung gemeinsam zeigen</span></a>
+        <a href="/instrumentengeschichten/"><strong>Instrumentengeschichten</strong><span>Stempel, Herkunft und Restaurierungen dokumentiert</span></a>
         <a href="/instrument-verkaufen/"><strong>Andere Instrumente</strong><span>Einfach auswählen oder „Ich weiß es nicht“ nutzen</span></a>
       </div>
     </div>
@@ -114,6 +159,12 @@ const offerUrl = `/instrument-verkaufen/?city=${encodeURIComponent(city.name)}`;
         <summary>Bekomme ich automatisch einen Preis angezeigt?</summary>
         <p>Nein. Eine seriöse Prüfung soll nicht allein aus wenigen Formulardaten automatisch einen Wert ableiten. Die Anfrage wird persönlich angesehen und anschließend individuell beantwortet.</p>
       </details>
+      {city.localGuide?.faq && (
+        <details>
+          <summary>{city.localGuide.faq.question}</summary>
+          <p>{city.localGuide.faq.answer}</p>
+        </details>
+      )}
       <div class="city-final-cta">
         <div>
           <strong>Instrument aus {city.name} jetzt zeigen</strong>
