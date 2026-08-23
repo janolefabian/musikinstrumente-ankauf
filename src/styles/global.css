@@ -1970,6 +1970,70 @@ kbd {
 .lightbox-open {
   overflow: hidden;
 }
+.review-action-dialog[hidden] {
+  display: none;
+}
+.review-action-dialog {
+  position: fixed;
+  z-index: 10000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+.review-action-dialog-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: rgba(22, 25, 23, 0.64);
+  cursor: default;
+}
+.review-action-dialog-panel {
+  position: relative;
+  width: min(100%, 520px);
+  border: 1px solid var(--line);
+  background: #fff;
+  padding: clamp(24px, 5vw, 42px);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.24);
+}
+.review-action-dialog-panel h2 {
+  margin: 8px 0 14px;
+  font-size: clamp(30px, 5vw, 46px);
+  line-height: 0.98;
+}
+.review-action-dialog-panel > p:not(.eyebrow) {
+  margin: 0;
+  color: var(--muted);
+  font-size: 18px;
+}
+.review-action-dialog-buttons {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 28px;
+}
+.review-action-dialog-buttons button {
+  min-height: 44px;
+  border: 1px solid var(--ink);
+  border-radius: 4px;
+  padding: 10px 16px;
+  background: var(--ink);
+  color: #fff;
+  font: 600 14px Arial, sans-serif;
+  cursor: pointer;
+}
+.review-action-dialog-buttons .ghost-button {
+  border-color: var(--line);
+  background: #fff;
+  color: var(--ink);
+}
+.review-dialog-open {
+  overflow: hidden;
+}
 @media (max-width: 1050px) {
   .review-workspace {
     grid-template-columns: 330px minmax(0, 1fr);

@@ -13,6 +13,20 @@
   const bulkArchiveEl = root.querySelector("[data-bulk-archive]");
   const bulkDeleteEl = root.querySelector("[data-bulk-delete]");
   const lightbox = root.querySelector("[data-lightbox]");
+  const actionDialogEl = root.querySelector("[data-action-dialog]");
+  const actionDialogEyebrowEl = root.querySelector(
+    "[data-action-dialog-eyebrow]",
+  );
+  const actionDialogTitleEl = root.querySelector("[data-action-dialog-title]");
+  const actionDialogMessageEl = root.querySelector(
+    "[data-action-dialog-message]",
+  );
+  const actionDialogCancelButton = root.querySelector(
+    "[data-action-dialog-cancel-button]",
+  );
+  const actionDialogConfirmButton = root.querySelector(
+    "[data-action-dialog-confirm]",
+  );
   const api = root.dataset.apiBase || "";
   const fallbackImage = "/images/header_instrumente-640.webp";
 
@@ -84,6 +98,8 @@
   let requestSequence = 0;
   let detailSequence = 0;
   let searchTimer = 0;
+  let actionDialogResolver = null;
+  let actionDialogPreviousFocus = null;
   const imageCache = new Map();
   const objectUrls = new Set();
   const imageQueue = [];
@@ -239,6 +255,54 @@
     const headers = new Headers(options.headers || {});
     if (token) headers.set("Authorization", `Bearer ${token}`);
     return fetch(url, { ...options, headers });
+  }
+
+  function closeActionDialog(result = false) {
+    if (actionDialogEl.hidden) return;
+    actionDialogEl.hidden = true;
+    actionDialogEl.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("review-dialog-open");
+    const resolver = actionDialogResolver;
+    actionDialogResolver = null;
+    if (actionDialogPreviousFocus?.focus) actionDialogPreviousFocus.focus();
+    actionDialogPreviousFocus = null;
+    if (resolver) resolver(result);
+  }
+
+  function showActionDialog({
+    eyebrow = "Bestätigung",
+    title = "Aktion bestätigen",
+    message,
+    confirmLabel = "Bestätigen",
+    cancelLabel = "Abbrechen",
+    danger = false,
+  }) {
+    if (actionDialogResolver) closeActionDialog(false);
+    actionDialogPreviousFocus = document.activeElement;
+    actionDialogEyebrowEl.textContent = eyebrow;
+    actionDialogTitleEl.textContent = title;
+    actionDialogMessageEl.textContent = message;
+    actionDialogConfirmButton.textContent = confirmLabel;
+    actionDialogConfirmButton.classList.toggle("danger-action", danger);
+    actionDialogCancelButton.textContent = cancelLabel;
+    actionDialogCancelButton.hidden = !cancelLabel;
+    actionDialogEl.hidden = false;
+    actionDialogEl.setAttribute("aria-hidden", "false");
+    document.body.classList.add("review-dialog-open");
+    window.requestAnimationFrame(() => actionDialogConfirmButton.focus());
+    return new Promise((resolve) => {
+      actionDialogResolver = resolve;
+    });
+  }
+
+  function showActionNotice(message, title = "Aktion fehlgeschlagen") {
+    return showActionDialog({
+      eyebrow: "Hinweis",
+      title,
+      message,
+      confirmLabel: "Schließen",
+      cancelLabel: "",
+    });
   }
 
   function renderAuthGate(invalid = false) {
@@ -645,12 +709,13 @@
   }
 
   async function deleteLead(id) {
-    if (
-      !confirm(
-        "Lead endgültig löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
-      )
-    )
-      return;
+    const confirmed = await showActionDialog({
+      title: "Anfrage endgültig löschen?",
+      message: "Diese Aktion kann nicht rückgängig gemacht werden.",
+      confirmLabel: "Endgültig löschen",
+      danger: true,
+    });
+    if (!confirmed) return;
     if (!api) {
       const index = demo.findIndex((lead) => lead.id === id);
       if (index >= 0) demo.splice(index, 1);
@@ -663,7 +728,9 @@
       { method: "DELETE" },
     );
     if (!response.ok) {
-      alert("Löschen fehlgeschlagen.");
+      await showActionNotice(
+        "Die Anfrage konnte nicht gelöscht werden. Bitte versuchen Sie es erneut.",
+      );
       return;
     }
     closeMobileDetail();
@@ -704,13 +771,15 @@
   async function runBulkAction(action) {
     const ids = [...selectedLeadIds];
     if (!ids.length) return;
-    if (
-      action === "delete" &&
-      !confirm(
-        `${ids.length} ${ids.length === 1 ? "Anfrage" : "Anfragen"} endgültig löschen? Diese Aktion kann nicht rückgängig gemacht werden.`,
-      )
-    )
-      return;
+    if (action === "delete") {
+      const confirmed = await showActionDialog({
+        title: `${ids.length} ${ids.length === 1 ? "Anfrage" : "Anfragen"} endgültig löschen?`,
+        message: "Diese Aktion kann nicht rückgängig gemacht werden.",
+        confirmLabel: "Endgültig löschen",
+        danger: true,
+      });
+      if (!confirmed) return;
+    }
 
     bulkArchiveEl.disabled = true;
     bulkDeleteEl.disabled = true;
@@ -765,7 +834,7 @@
       await loadLeads({ reset: true });
     } catch (error) {
       console.error(error);
-      alert(
+      await showActionNotice(
         action === "archive"
           ? "Die ausgewählten Anfragen konnten nicht archiviert werden."
           : "Die ausgewählten Anfragen konnten nicht gelöscht werden.",
@@ -849,6 +918,11 @@
   };
   bulkArchiveEl.onclick = () => runBulkAction("archive");
   bulkDeleteEl.onclick = () => runBulkAction("delete");
+  root.querySelectorAll("[data-action-dialog-cancel]").forEach((element) => {
+    element.onclick = () => closeActionDialog(false);
+  });
+  actionDialogCancelButton.onclick = () => closeActionDialog(false);
+  actionDialogConfirmButton.onclick = () => closeActionDialog(true);
 
   root.querySelectorAll("[data-filter]").forEach((button) => {
     button.onclick = () => {
@@ -879,6 +953,10 @@
   });
 
   window.addEventListener("keydown", (event) => {
+    if (!actionDialogEl.hidden) {
+      if (event.key === "Escape") closeActionDialog(false);
+      return;
+    }
     const tag = document.activeElement?.tagName;
     if (
       ["INPUT", "TEXTAREA", "SELECT"].includes(tag) ||

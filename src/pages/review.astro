@@ -75,6 +75,19 @@ const apiBase = import.meta.env.PUBLIC_API_BASE || '';
       </figure>
       <button class="lightbox-nav lightbox-next" type="button" data-lightbox-next aria-label="Nächstes Bild">›</button>
     </div>
+
+    <div class="review-action-dialog" data-action-dialog hidden aria-hidden="true">
+      <button class="review-action-dialog-backdrop" type="button" data-action-dialog-cancel aria-label="Dialog schließen"></button>
+      <section class="review-action-dialog-panel" role="dialog" aria-modal="true" aria-labelledby="review-action-dialog-title" aria-describedby="review-action-dialog-message">
+        <p class="eyebrow" data-action-dialog-eyebrow>Bestätigung</p>
+        <h2 id="review-action-dialog-title" data-action-dialog-title>Aktion bestätigen</h2>
+        <p id="review-action-dialog-message" data-action-dialog-message></p>
+        <div class="review-action-dialog-buttons">
+          <button class="ghost-button" type="button" data-action-dialog-cancel-button>Abbrechen</button>
+          <button type="button" data-action-dialog-confirm>Bestätigen</button>
+        </div>
+      </section>
+    </div>
   </section>
-  <script src="/js/review.js?v=20260823-2" is:inline></script>
+  <script src="/js/review.js?v=20260823-3" is:inline></script>
 </BaseLayout>
