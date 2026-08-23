@@ -734,7 +734,32 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ids, action }),
         });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        if (response.status === 404 || response.status === 405) {
+          // Older Worker versions do not expose the bulk endpoint yet. Keep the
+          // dashboard usable by applying the same action through the established
+          // per-lead endpoints until every edge serves the current Worker.
+          for (const id of ids) {
+            const fallbackResponse = await apiFetch(
+              `${api}/api/review/${encodeURIComponent(id)}`,
+              action === "archive"
+                ? {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ status: "archived" }),
+                  }
+                : { method: "DELETE" },
+            );
+            if (!fallbackResponse.ok)
+              throw new Error(
+                `Fallback HTTP ${fallbackResponse.status} (${id})`,
+              );
+          }
+        } else if (!response.ok) {
+          const detail = await response.text().catch(() => "");
+          throw new Error(
+            `HTTP ${response.status}${detail ? `: ${detail}` : ""}`,
+          );
+        }
       }
       if (selectedId && selectedLeadIds.has(selectedId)) closeMobileDetail();
       await loadLeads({ reset: true });

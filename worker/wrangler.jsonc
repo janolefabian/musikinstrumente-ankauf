@@ -5,9 +5,9 @@
   "compatibility_date": "2026-08-01",
 
   "vars": {
-    "ALLOWED_ORIGIN": "http://localhost:4321",
+    "ALLOWED_ORIGIN": "https://musikinstrument-ankauf.de",
     "OPENAI_MODEL": "gpt-5-mini",
-    "REVIEW_BASE_URL": "http://localhost:4321",
+    "REVIEW_BASE_URL": "https://musikinstrument-ankauf.de",
   },
 
   "r2_buckets": [
