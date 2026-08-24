@@ -43,6 +43,30 @@ function jpeg(name = "detail.jpg") {
   );
 }
 
+function photoCheckRequest({
+  mode = "quality",
+  expected = "Ganzes Instrument von vorne",
+  instruction = "Fotografieren Sie das Instrument vollständig von vorne.",
+} = {}) {
+  const form = new FormData();
+  form.set("image", jpeg("check.jpg"));
+  form.set("expected", expected);
+  form.set("instruction", instruction);
+  form.set("mode", mode);
+  return new Request("https://api.example.test/api/photo-check", {
+    method: "POST",
+    headers: { Origin: allowedOrigin },
+    body: form,
+  });
+}
+
+function openAIPhotoResponse(result) {
+  return new Response(
+    JSON.stringify({ output_text: JSON.stringify(result) }),
+    { status: 200, headers: { "Content-Type": "application/json" } },
+  );
+}
+
 function initialRequest({
   key = "initial-operation-key-000001",
   photos = [],
@@ -133,6 +157,134 @@ async function runScheduled(env) {
   assert.ok(task, "scheduled maintenance must register a task");
   await task;
 }
+
+test("photo check is unavailable without an OpenAI API key", async () => {
+  const env = environment();
+  try {
+    const response = await worker.fetch(
+      photoCheckRequest(),
+      env,
+      context(),
+    );
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), {
+      error: "photo_check_unavailable",
+    });
+  } finally {
+    env.LEADS.close();
+  }
+});
+
+test("photo check derives a rejection from the structured issue code", async () => {
+  const env = environment({ OPENAI_API_KEY: "test-openai-key" });
+  const originalFetch = globalThis.fetch;
+  let requestBody;
+  globalThis.fetch = async (url, options) => {
+    assert.equal(url, "https://api.openai.com/v1/responses");
+    requestBody = JSON.parse(options.body);
+    return openAIPhotoResponse({
+      issue_code: "wrong_subject",
+      message: "Bitte fotografieren Sie stattdessen das Instrument.",
+    });
+  };
+
+  try {
+    const response = await worker.fetch(
+      photoCheckRequest(),
+      env,
+      context(),
+    );
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      ok: false,
+      issue_code: "wrong_subject",
+      message: "Bitte fotografieren Sie stattdessen das Instrument.",
+    });
+    assert.equal(requestBody.model, "gpt-5-mini");
+    assert.deepEqual(
+      requestBody.text.format.schema.properties.issue_code.enum,
+      [
+        "none",
+        "wrong_subject",
+        "not_visible",
+        "extreme_blur",
+        "extreme_exposure",
+        "severe_crop",
+      ],
+    );
+    assert.equal(
+      Object.hasOwn(requestBody.text.format.schema.properties, "ok"),
+      false,
+    );
+    const imageInput = requestBody.input[0].content.find(
+      (item) => item.type === "input_image",
+    );
+    assert.match(imageInput.image_url, /^data:image\/jpeg;base64,/u);
+  } finally {
+    globalThis.fetch = originalFetch;
+    env.LEADS.close();
+  }
+});
+
+test("photo check rejects malformed values instead of coercing them", async () => {
+  const env = environment({ OPENAI_API_KEY: "test-openai-key" });
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    openAIPhotoResponse({
+      issue_code: "wrong_subject",
+      message: "Das Motiv passt nicht.",
+      ok: "false",
+    });
+
+  try {
+    const response = await worker.fetch(
+      photoCheckRequest(),
+      env,
+      context(),
+    );
+    assert.equal(response.status, 502);
+    assert.deepEqual(await response.json(), {
+      error: "photo_check_invalid_response",
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    env.LEADS.close();
+  }
+});
+
+test("photo check accepts a valid positive structured result", async () => {
+  const env = environment({
+    OPENAI_API_KEY: "test-openai-key",
+    OPENAI_MODEL: "  ",
+  });
+  const originalFetch = globalThis.fetch;
+  let selectedModel;
+  globalThis.fetch = async (_url, options) => {
+    selectedModel = JSON.parse(options.body).model;
+    return openAIPhotoResponse({
+      issue_code: "none",
+      message: "Das Foto ist für diese Ansicht gut verwendbar.",
+    });
+  };
+
+  try {
+    const response = await worker.fetch(
+      photoCheckRequest(),
+      env,
+      context(),
+    );
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      ok: true,
+      issue_code: "none",
+      message: "Das Foto ist für diese Ansicht gut verwendbar.",
+    });
+    assert.equal(selectedModel, "gpt-5-mini");
+  } finally {
+    globalThis.fetch = originalFetch;
+    env.LEADS.close();
+  }
+});
 
 test("current submissions require a key and a plausible explicit consent time", async () => {
   const env = environment();

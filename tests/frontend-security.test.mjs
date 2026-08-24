@@ -84,3 +84,68 @@ test("photo quality warnings have a user-controlled override", async () => {
   const source = await readFile(wizardPath, "utf8");
   assert.match(source, /(?:Foto\s+)?trotzdem\s+verwenden/i);
 });
+
+test("automatic photo checks require a separate optional consent in the photo step", async () => {
+  const source = await readFile(wizardPath, "utf8");
+  const styles = await readFile(stylesPath, "utf8");
+  assert.match(source, /data-photo-check-consent/);
+  assert.match(source, /Automatische Foto-Prüfung nutzen/);
+  assert.match(source, /verkleinerte Kopie[\s\S]*?OpenAI/);
+  assert.match(source, /Ohne Zustimmung[\s\S]*?technische Merkmale[\s\S]*?Browser/);
+  assert.match(source, /aria-describedby="photo-check-consent-note"/);
+  assert.match(
+    source,
+    /state\.photoCheckConsentAccepted\s*=\s*photoCheckConsentInput\.checked/,
+  );
+  assert.match(
+    source,
+    /const photoCheckConsent\s*=\s*!state\.consentAccepted/,
+    "the early AI-consent choice should disappear after the general consent",
+  );
+  assert.match(
+    styles,
+    /\.photo-check-consent\s*\{[\s\S]*?grid-template-columns:[\s\S]*?minmax\(0,\s*1fr\)/,
+  );
+  assert.match(styles, /\.photo-check-consent input:focus-visible/);
+});
+
+test("local-only photo checks never claim that an image is good", async () => {
+  const source = await readFile(wizardPath, "utf8");
+  const handleStart = source.indexOf("async function handlePhoto");
+  const handleEnd = source.indexOf("\n  function simpleScreen", handleStart);
+  const handleSource = source.slice(handleStart, handleEnd);
+  assert.ok(handleStart >= 0 && handleEnd > handleStart);
+  assert.match(
+    handleSource,
+    /lokale technische Prüfung war unauffällig[\s\S]*?Bildinhalt wurde nicht automatisch geprüft/,
+  );
+  assert.doesNotMatch(source, /Das Foto ist gut brauchbar\./);
+});
+
+test("the first and last relevant photo can reach AI while accessories remain local", async () => {
+  const source = await readFile(wizardPath, "utf8");
+  const handleStart = source.indexOf("async function handlePhoto");
+  const handleEnd = source.indexOf("\n  function simpleScreen", handleStart);
+  const handleSource = source.slice(handleStart, handleEnd);
+  assert.match(
+    handleSource,
+    /\(state\.photoCheckConsentAccepted\s*\|\|\s*state\.consentAccepted\)\s*&&[\s\S]*?item\[0\]\s*!==\s*"accessories"[\s\S]*?isAIType\(state\.type\)/,
+  );
+  assert.doesNotMatch(handleSource, /state\.photoIndex\s*===\s*flow\(\)\.length\s*-\s*1/);
+  assert.match(
+    handleSource,
+    /Zusatzfoto gespeichert\. Es wurde ohne automatische Inhaltsprüfung übernommen\./,
+  );
+});
+
+test("photo-check accepts only a normal 200 response with an explicit boolean decision", async () => {
+  const source = await readFile(wizardPath, "utf8");
+  const checkStart = source.indexOf("async function aiCheck");
+  const checkEnd = source.indexOf("\n  function advanceAfterAcceptedPhoto", checkStart);
+  const checkSource = source.slice(checkStart, checkEnd);
+  assert.ok(checkStart >= 0 && checkEnd > checkStart);
+  assert.match(checkSource, /res\.status\s*!==\s*200/);
+  assert.match(checkSource, /typeof result\.ok\s*===\s*"boolean"/);
+  assert.match(checkSource, /\["pending",\s*"partial"\]\.includes/);
+  assert.match(checkSource, /throw new Error\("quality_invalid_response"\)/);
+});

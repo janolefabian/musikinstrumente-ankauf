@@ -38,6 +38,27 @@ const MAX_AI_IMAGE_BYTES = 2 * 1024 * 1024;
 const MAX_PHOTO_CHECK_BYTES = 2 * 1024 * 1024;
 const MAX_LEAD_REQUEST_BYTES = 40 * 1024 * 1024;
 const MAX_PHOTO_CHECK_REQUEST_BYTES = 3 * 1024 * 1024;
+const DEFAULT_OPENAI_MODEL = "gpt-5-mini";
+const PHOTO_ISSUE_CODES = [
+  "none",
+  "wrong_subject",
+  "not_visible",
+  "extreme_blur",
+  "extreme_exposure",
+  "severe_crop",
+];
+const PHOTO_ISSUE_CODE_SET = new Set(PHOTO_ISSUE_CODES);
+const DETECTED_INSTRUMENT_TYPES = [
+  "double_bass",
+  "bow",
+  "violin",
+  "viola",
+  "cello",
+  "guitar",
+  "other",
+  "uncertain",
+];
+const DETECTED_INSTRUMENT_TYPE_SET = new Set(DETECTED_INSTRUMENT_TYPES);
 
 class ApiError extends Error {
   constructor(status, code, headers = {}) {
@@ -933,6 +954,66 @@ async function openai(env, body) {
     throw new Error(`OpenAI ${r.status}: ${(await r.text()).slice(0, 500)}`);
   return r.json();
 }
+
+function openAIModel(env) {
+  const configured =
+    typeof env.OPENAI_MODEL === "string" ? env.OPENAI_MODEL.trim() : "";
+  return /^[A-Za-z0-9._:-]{1,100}$/u.test(configured)
+    ? configured
+    : DEFAULT_OPENAI_MODEL;
+}
+
+function invalidPhotoCheckResponse() {
+  apiError(502, "photo_check_invalid_response");
+}
+
+function parsePhotoCheckResult(response, mode) {
+  const output = extractText(response);
+  if (typeof output !== "string" || !output.trim())
+    invalidPhotoCheckResponse();
+
+  let result;
+  try {
+    result = JSON.parse(output);
+  } catch {
+    invalidPhotoCheckResponse();
+  }
+  if (!result || typeof result !== "object" || Array.isArray(result))
+    invalidPhotoCheckResponse();
+  const allowedKeys = new Set(
+    mode === "identify"
+      ? ["issue_code", "message", "detected_type"]
+      : ["issue_code", "message"],
+  );
+  if (Object.keys(result).some((key) => !allowedKeys.has(key)))
+    invalidPhotoCheckResponse();
+
+  const issueCode = result.issue_code;
+  if (typeof issueCode !== "string" || !PHOTO_ISSUE_CODE_SET.has(issueCode))
+    invalidPhotoCheckResponse();
+
+  if (typeof result.message !== "string") invalidPhotoCheckResponse();
+  const message = result.message.replace(/\0/g, "").trim();
+  if (!message || message.length > 500) invalidPhotoCheckResponse();
+
+  let detectedType;
+  if (mode === "identify") {
+    detectedType = result.detected_type;
+    if (
+      typeof detectedType !== "string" ||
+      !DETECTED_INSTRUMENT_TYPE_SET.has(detectedType)
+    )
+      invalidPhotoCheckResponse();
+  }
+
+  return {
+    ok: issueCode === "none",
+    issue_code: issueCode,
+    message,
+    ...(mode === "identify" && { detected_type: detectedType }),
+  };
+}
+
 async function blobDataUrl(blob) {
   const bytes = new Uint8Array(await blob.arrayBuffer());
   let bin = "";
@@ -954,92 +1035,57 @@ async function photoCheck(request, env) {
   if (!(image instanceof File))
     return json({ error: "image missing" }, 400, request, env);
   await validateImageFile(image, MAX_PHOTO_CHECK_BYTES, "invalid_image");
-  if (!env.OPENAI_API_KEY)
-    return json(
-      { ok: true, message: "Foto ist brauchbar." },
-      200,
-      request,
-      env,
-    );
+  if (!env.OPENAI_API_KEY) apiError(503, "photo_check_unavailable");
   const dataUrl = await blobDataUrl(image);
-  const schema =
-    mode === "identify"
-      ? {
-          type: "object",
-          properties: {
-            ok: { type: "boolean" },
-            message: { type: "string" },
-            detected_type: {
-              type: "string",
-              enum: [
-                "double_bass",
-                "bow",
-                "violin",
-                "viola",
-                "cello",
-                "guitar",
-                "other",
-                "uncertain",
-              ],
-            },
-          },
-          required: ["ok", "message", "detected_type"],
-          additionalProperties: false,
-        }
-      : {
-          type: "object",
-          properties: { ok: { type: "boolean" }, message: { type: "string" } },
-          required: ["ok", "message"],
-          additionalProperties: false,
-        };
+  const properties = {
+    issue_code: { type: "string", enum: PHOTO_ISSUE_CODES },
+    message: { type: "string" },
+  };
+  const required = ["issue_code", "message"];
+  if (mode === "identify") {
+    properties.detected_type = {
+      type: "string",
+      enum: DETECTED_INSTRUMENT_TYPES,
+    };
+    required.push("detected_type");
+  }
+  const schema = {
+    type: "object",
+    properties,
+    required,
+    additionalProperties: false,
+  };
   const prompt =
     mode === "identify"
       ? `${PHOTO_PROMPT}\nZusätzlich ordne den Gegenstand grob ein. Wenn unsicher, detected_type=uncertain. Aufgabe: ${redactContactDetails(expected)}. ${redactContactDetails(instruction)}`
       : `${PHOTO_PROMPT}\nErwartetes Motiv: ${redactContactDetails(expected)}. Anweisung: ${redactContactDetails(instruction)}`;
-  const response = await openai(env, {
-    model: env.OPENAI_MODEL || "gpt-5.6-luna",
-    input: [
-      {
-        role: "user",
-        content: [
-          { type: "input_text", text: prompt },
-          { type: "input_image", image_url: dataUrl, detail: "low" },
-        ],
+  let response;
+  try {
+    response = await openai(env, {
+      model: openAIModel(env),
+      input: [
+        {
+          role: "user",
+          content: [
+            { type: "input_text", text: prompt },
+            { type: "input_image", image_url: dataUrl, detail: "low" },
+          ],
+        },
+      ],
+      text: {
+        format: {
+          type: "json_schema",
+          name: "photo_check",
+          strict: true,
+          schema,
+        },
       },
-    ],
-    text: {
-      format: {
-        type: "json_schema",
-        name: "photo_check",
-        strict: true,
-        schema,
-      },
-    },
-  });
-  const result = JSON.parse(extractText(response));
-  return json(
-    {
-      ok: Boolean(result.ok),
-      message: boundedText(result.message, 500, "photo_check_message"),
-      ...(mode === "identify" && {
-        detected_type: [
-          "double_bass",
-          "bow",
-          "violin",
-          "viola",
-          "cello",
-          "guitar",
-          "other",
-          "uncertain",
-        ].includes(result.detected_type)
-          ? result.detected_type
-          : "uncertain",
-      }),
-    },
-    200,
-    request,
-    env,
-  );
+    });
+  } catch (error) {
+    console.error("Photo check unavailable", error);
+    apiError(503, "photo_check_unavailable");
+  }
+  return json(parsePhotoCheckResult(response, mode), 200, request, env);
 }
 
 async function analyzeLead(env, meta, smallImages = []) {
@@ -1088,7 +1134,7 @@ async function analyzeLead(env, meta, smallImages = []) {
   for (const image of smallImages.slice(0, 8))
     content.push({ type: "input_image", image_url: image, detail: "low" });
   const response = await openai(env, {
-    model: env.OPENAI_MODEL || "gpt-5.6-luna",
+    model: openAIModel(env),
     input: [{ role: "user", content }],
     text: {
       format: {

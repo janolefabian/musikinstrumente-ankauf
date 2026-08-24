@@ -751,6 +751,43 @@ select {
   object-fit: contain;
   margin-top: 14px;
 }
+.photo-check-consent {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 11px;
+  align-items: start;
+  max-width: 640px;
+  margin: 18px auto 0;
+  padding: 14px 16px;
+  border: 1px solid #ccd8d6;
+  border-radius: 6px;
+  background: #fff;
+  color: #465452;
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  text-align: left;
+}
+.photo-check-consent input {
+  width: 20px;
+  height: 20px;
+  margin: 1px 0 0;
+}
+.photo-check-consent label {
+  cursor: pointer;
+}
+.photo-check-consent p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.photo-check-consent a {
+  color: var(--accent-dark);
+}
+.photo-check-consent input:focus-visible {
+  outline: 3px solid rgba(20, 116, 120, 0.28);
+  outline-offset: 2px;
+}
 .photo-actions {
   display: flex;
   gap: 12px;
@@ -1316,6 +1353,17 @@ select {
   }
   .help-example {
     height: 200px;
+  }
+  .photo-frame {
+    padding: 18px 14px;
+  }
+  .photo-check-consent {
+    grid-template-columns: 24px minmax(0, 1fr);
+    padding: 13px;
+  }
+  .photo-check-consent input {
+    width: 22px;
+    height: 22px;
   }
   .site-footer {
     flex-direction: column;

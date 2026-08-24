@@ -194,6 +194,7 @@
     uploadedPhotoCount: 0,
     demoStorageKey: null,
     consentAccepted: false,
+    photoCheckConsentAccepted: false,
     consentAt: null,
     isSubmitting: false,
     requestKey: null,
@@ -280,6 +281,7 @@
           photoIndex: state.photoIndex,
           maker: String(state.data.maker || "").slice(0, 160),
           story: String(state.data.story || "").slice(0, 3000),
+          photoCheckConsentAccepted: state.photoCheckConsentAccepted === true,
           savedAt: Date.now(),
         }),
       );
@@ -317,6 +319,8 @@
     state.continuationToken = saved.continuationToken.slice(0, 512);
     state.leadSaved = true;
     state.consentAccepted = true;
+    state.photoCheckConsentAccepted =
+      saved.photoCheckConsentAccepted === true;
     state.uploadedPhotoCount = 0;
     state.data.maker = typeof saved.maker === "string" ? saved.maker.slice(0, 160) : "";
     state.data.story = typeof saved.story === "string" ? saved.story.slice(0, 3000) : "";
@@ -385,6 +389,7 @@
     state.classifiedType = null;
     state.photoIndex = 0;
     state.photos = [];
+    state.photoCheckConsentAccepted = false;
     if (isAIType(type)) push("photos");
     else push("simple");
   }
@@ -454,8 +459,14 @@
     const skipAction = state.leadSaved
       ? `<button type="button" class="ghost-button" data-skip>Diesen Schritt überspringen</button>`
       : "";
+    const photoCheckConsent =
+      !state.consentAccepted &&
+      item[0] !== "accessories" &&
+      isAIType(state.type)
+        ? `<div class="photo-check-consent"><input id="photo-check-consent" name="photo_check_consent" type="checkbox" data-photo-check-consent aria-describedby="photo-check-consent-note" ${state.photoCheckConsentAccepted ? "checked" : ""}><div><label for="photo-check-consent"><strong>Automatische Foto-Prüfung nutzen</strong> <span class="optional">(optional)</span></label><p id="photo-check-consent-note">Solange diese Option aktiviert ist, wird eine verkleinerte Kopie des ausgewählten Fotos an OpenAI übermittelt. Ohne Zustimmung prüfen wir nur technische Merkmale direkt in Ihrem Browser. Sie können trotzdem fortfahren. <a href="/datenschutz/" target="_blank" rel="noopener">Datenschutz</a></p></div></div>`
+        : "";
     renderStage(
-      `<div class="photo-step">${savedNotice}<div class="photo-step-header"><p class="eyebrow">${state.leadSaved ? "Ergänzendes Foto" : "Erstes Foto"} ${state.leadSaved ? `${state.photoIndex + 1} von ${items.length}` : ""}</p><div class="photo-progress-dots">${dots}</div></div><h2 class="wizard-title">${item[1]}</h2><p class="wizard-copy">${item[2]}</p>${saveNote}<div class="photo-step-grid"><div class="photo-instructions">${helpMarkup(item)}<div class="photo-frame"><input type="file" accept="image/*" capture="environment" data-camera-file hidden><input type="file" accept="image/*" ${allowMultiple ? "multiple" : ""} data-library-file hidden><div data-preview><p>Noch kein Foto aufgenommen.</p></div><div class="photo-actions"><button type="button" class="photo-button" data-camera>Foto aufnehmen</button><button type="button" class="ghost-button" data-library>Aus Mediathek wählen</button>${skipAction}</div><div data-quality role="status" aria-live="polite"></div></div></div></div>${early}</div>`,
+      `<div class="photo-step">${savedNotice}<div class="photo-step-header"><p class="eyebrow">${state.leadSaved ? "Ergänzendes Foto" : "Erstes Foto"} ${state.leadSaved ? `${state.photoIndex + 1} von ${items.length}` : ""}</p><div class="photo-progress-dots">${dots}</div></div><h2 class="wizard-title">${item[1]}</h2><p class="wizard-copy">${item[2]}</p>${saveNote}<div class="photo-step-grid"><div class="photo-instructions">${helpMarkup(item)}<div class="photo-frame"><input type="file" accept="image/*" capture="environment" data-camera-file hidden><input type="file" accept="image/*" ${allowMultiple ? "multiple" : ""} data-library-file hidden><div data-preview><p>Noch kein Foto aufgenommen.</p></div>${photoCheckConsent}<div class="photo-actions"><button type="button" class="photo-button" data-camera>Foto aufnehmen</button><button type="button" class="ghost-button" data-library>Aus Mediathek wählen</button>${skipAction}</div><div data-quality role="status" aria-live="polite"></div></div></div></div>${early}</div>`,
     );
     const help = stage.querySelector("[data-help]");
     if (help) {
@@ -474,13 +485,23 @@
     const libraryFile = stage.querySelector("[data-library-file]");
     const cameraButton = stage.querySelector("[data-camera]");
     const libraryButton = stage.querySelector("[data-library]");
+    const photoCheckConsentInput = stage.querySelector(
+      "[data-photo-check-consent]",
+    );
     const quality = stage.querySelector("[data-quality]");
     const preview = stage.querySelector("[data-preview]");
     const setPhotoControlsBusy = (busy) => {
       cameraButton.disabled = busy;
       libraryButton.disabled = busy;
+      if (photoCheckConsentInput) photoCheckConsentInput.disabled = busy;
       back.disabled = busy;
     };
+    if (photoCheckConsentInput) {
+      photoCheckConsentInput.addEventListener("change", () => {
+        state.photoCheckConsentAccepted = photoCheckConsentInput.checked;
+        persistContinuation();
+      });
+    }
     const renderAccessoryPreview = () => {
       if (item[0] !== "accessories") return;
       releaseObjectUrls();
@@ -535,6 +556,9 @@
     const fileHandler = async (files) => {
       const selectedFiles = Array.from(files || []);
       if (!selectedFiles.length) return;
+      if (photoCheckConsentInput) {
+        state.photoCheckConsentAccepted = photoCheckConsentInput.checked;
+      }
 
       const maxPhotos = 5;
       const accessoryCount = state.photos.filter((p) => p.kind === "accessories").length;
@@ -674,24 +698,53 @@
     }
   }
   async function aiCheck(blob, item) {
-    if (!apiBase)
-      return { ok: true, message: "Foto ist brauchbar (lokaler Demo-Modus)." };
+    if (!apiBase) throw new Error("quality_unavailable");
     const body = new FormData();
     body.append("image", blob, "check.jpg");
     body.append("expected", item[1]);
     body.append("instruction", item[2]);
-    body.append(
-      "mode",
+    const mode =
       state.type === "unknown" && state.photoIndex === 0
         ? "identify"
-        : "quality",
-    );
+        : "quality";
+    body.append("mode", mode);
     const res = await fetch(`${apiBase}/api/photo-check`, {
       method: "POST",
       body,
     });
-    if (!res.ok) throw new Error("quality");
-    return await res.json();
+    if (res.status !== 200) throw new Error("quality_unavailable");
+    const result = await res.json();
+    const isPending = ["pending", "partial"].includes(
+      result?.processing_status,
+    );
+    const hasValidShape =
+      result &&
+      typeof result === "object" &&
+      !Array.isArray(result) &&
+      typeof result.ok === "boolean" &&
+      typeof result.message === "string" &&
+      Boolean(result.message.trim());
+    const detectedTypes = new Set([
+      "double_bass",
+      "bow",
+      "violin",
+      "viola",
+      "cello",
+      "guitar",
+      "other",
+      "uncertain",
+    ]);
+    if (
+      !hasValidShape ||
+      isPending ||
+      (mode === "identify" && !detectedTypes.has(result.detected_type))
+    ) {
+      throw new Error("quality_invalid_response");
+    }
+    return {
+      ...result,
+      message: result.message.trim().slice(0, 400),
+    };
   }
   function advanceAfterAcceptedPhoto() {
     if (!state.leadSaved && isAIType(state.type)) {
@@ -768,41 +821,45 @@
     }
 
     const isSmallImage = Math.max(dimensions.width, dimensions.height) < 800;
+    let acceptedLocalWarning = false;
     if (!local.ok || isSmallImage) {
       const warning = !local.ok
         ? local.message
         : "Dieses Bild ist recht klein. Eine größere Aufnahme wäre für die Prüfung hilfreicher.";
       const accepted = await requestPhotoDecision(quality, preview, warning);
       if (!accepted) return false;
+      acceptedLocalWarning = true;
+    }
+
+    const shouldUseAi =
+      (state.photoCheckConsentAccepted || state.consentAccepted) &&
+      item[0] !== "accessories" &&
+      isAIType(state.type);
+    if (!shouldUseAi) {
+      const localMessage =
+        item[0] === "accessories"
+          ? "Zusatzfoto gespeichert. Es wurde ohne automatische Inhaltsprüfung übernommen."
+          : acceptedLocalWarning
+            ? "Foto trotz des technischen Hinweises gespeichert. Der Bildinhalt wurde nicht automatisch geprüft."
+            : "Foto gespeichert. Die lokale technische Prüfung war unauffällig. Der Bildinhalt wurde nicht automatisch geprüft.";
+      addAcceptedPhoto(selected, item, quality, localMessage);
+      return true;
+    }
+
+    let result;
+    try {
+      result = await aiCheck(small, item);
+    } catch (_) {
       addAcceptedPhoto(
         selected,
         item,
         quality,
-        "Foto gespeichert. Sie können jetzt fortfahren.",
+        "Foto gespeichert. Die automatische Prüfung ist gerade nicht erreichbar – Sie können trotzdem fortfahren.",
       );
       return true;
     }
 
-    let result = { ok: true, message: "Das Foto ist gut brauchbar." };
-    const disableAi =
-      !state.consentAccepted ||
-      item[0] === "accessories" ||
-      state.photoIndex === flow().length - 1;
-    if (!disableAi && isAIType(state.type)) {
-      try {
-        result = await aiCheck(small, item);
-      } catch (_) {
-        addAcceptedPhoto(
-          selected,
-          item,
-          quality,
-          "Foto gespeichert. Die automatische Prüfung ist gerade nicht erreichbar – Sie können trotzdem fortfahren.",
-        );
-        return true;
-      }
-    }
-
-    const acceptedAfterWarning = !result || result.ok === false;
+    const acceptedAfterWarning = result.ok === false;
     if (acceptedAfterWarning) {
       const serverMessage =
         typeof result?.message === "string" && result.message.trim()
@@ -827,9 +884,7 @@
     }
     const successMessage = acceptedAfterWarning
       ? "Foto wurde trotz des Hinweises gespeichert."
-      : typeof result?.message === "string" && result.message.trim()
-        ? result.message.trim().slice(0, 400)
-        : "Das Foto ist gut brauchbar.";
+      : result.message;
     addAcceptedPhoto(selected, item, quality, successMessage);
     return true;
   }
