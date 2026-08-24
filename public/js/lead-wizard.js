@@ -165,9 +165,17 @@
     label: "/images/photo-help/doublebass/kontrabass-zettel.webp",
   };
 
+  const VALID_TYPES = new Set(TYPES.map(([type]) => type));
+  const CONTINUATION_KEY = "instrument-anfrage-continuation-v1";
+  const CONTINUATION_MAX_AGE = 24 * 60 * 60 * 1000;
+  const requestedType = params.get("type");
+  const initialType = VALID_TYPES.has(requestedType) ? requestedType : null;
+  const initialCity = (params.get("city") || "").trim().slice(0, 120);
+  const activeObjectUrls = new Set();
+  let shouldFocusStage = false;
+
   const state = {
-    type: params.get("type") || null,
-    city: params.get("city") || "",
+    type: initialType,
     step: "type",
     photoIndex: 0,
     photos: [],
@@ -177,7 +185,7 @@
       name: "",
       email: "",
       phone: "",
-      city: params.get("city") || "",
+      city: initialCity,
     },
     classifiedType: null,
     leadId: null,
@@ -185,6 +193,11 @@
     leadSaved: false,
     uploadedPhotoCount: 0,
     demoStorageKey: null,
+    consentAccepted: false,
+    consentAt: null,
+    isSubmitting: false,
+    requestKey: null,
+    continuationRequestKey: null,
   };
 
   function isAIType(type) {
@@ -198,25 +211,160 @@
   function isInitialGuidedRequest() {
     return isAIType(state.type) && !state.leadSaved && state.photos.length > 0;
   }
+  function releaseObjectUrls() {
+    activeObjectUrls.forEach((url) => URL.revokeObjectURL(url));
+    activeObjectUrls.clear();
+  }
+  function makeObjectUrl(file) {
+    const url = URL.createObjectURL(file);
+    activeObjectUrls.add(url);
+    return url;
+  }
+  function clearElement(element) {
+    while (element?.firstChild) element.removeChild(element.firstChild);
+  }
+  function showQuality(container, kind, message, actions = []) {
+    if (!container) return;
+    clearElement(container);
+    const notice = document.createElement("div");
+    notice.className = `quality ${kind}`;
+    notice.textContent = message;
+    container.appendChild(notice);
+    if (!actions.length) return;
+    const actionRow = document.createElement("div");
+    actionRow.className = "photo-actions quality-actions";
+    actions.forEach(({ label, className = "ghost-button", onClick }) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = className;
+      button.textContent = label;
+      button.addEventListener("click", onClick, { once: true });
+      actionRow.appendChild(button);
+    });
+    container.appendChild(actionRow);
+  }
+  function setButtonBusy(button, busy, busyLabel) {
+    if (!button) return;
+    if (!button.dataset.idleLabel) button.dataset.idleLabel = button.textContent;
+    button.disabled = busy;
+    button.setAttribute("aria-busy", String(busy));
+    button.textContent = busy ? busyLabel : button.dataset.idleLabel;
+  }
+  function createRequestKey() {
+    if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join(
+      "",
+    );
+  }
+  function clearContinuation() {
+    try {
+      sessionStorage.removeItem(CONTINUATION_KEY);
+    } catch (_) {
+      // The form still works when browser storage is unavailable.
+    }
+  }
+  function persistContinuation() {
+    if (!state.leadSaved || !state.leadId || !state.continuationToken) return;
+    try {
+      sessionStorage.setItem(
+        CONTINUATION_KEY,
+        JSON.stringify({
+          leadId: String(state.leadId).slice(0, 160),
+          continuationToken: String(state.continuationToken).slice(0, 512),
+          type: state.type,
+          classifiedType: VALID_TYPES.has(state.classifiedType)
+            ? state.classifiedType
+            : null,
+          photoIndex: state.photoIndex,
+          maker: String(state.data.maker || "").slice(0, 160),
+          story: String(state.data.story || "").slice(0, 3000),
+          savedAt: Date.now(),
+        }),
+      );
+    } catch (_) {
+      // A blocked sessionStorage must never block an enquiry.
+    }
+  }
+  function restoreContinuation() {
+    let saved;
+    try {
+      saved = JSON.parse(sessionStorage.getItem(CONTINUATION_KEY) || "null");
+    } catch (_) {
+      clearContinuation();
+      return false;
+    }
+    if (
+      !saved ||
+      !VALID_TYPES.has(saved.type) ||
+      typeof saved.leadId !== "string" ||
+      !saved.leadId ||
+      typeof saved.continuationToken !== "string" ||
+      !saved.continuationToken ||
+      !Number.isFinite(saved.savedAt) ||
+      Date.now() - saved.savedAt > CONTINUATION_MAX_AGE ||
+      (initialType && initialType !== saved.type)
+    ) {
+      if (!initialType || initialType === saved?.type) clearContinuation();
+      return false;
+    }
+    state.type = saved.type;
+    state.classifiedType = VALID_TYPES.has(saved.classifiedType)
+      ? saved.classifiedType
+      : null;
+    state.leadId = saved.leadId.slice(0, 160);
+    state.continuationToken = saved.continuationToken.slice(0, 512);
+    state.leadSaved = true;
+    state.consentAccepted = true;
+    state.uploadedPhotoCount = 0;
+    state.data.maker = typeof saved.maker === "string" ? saved.maker.slice(0, 160) : "";
+    state.data.story = typeof saved.story === "string" ? saved.story.slice(0, 3000) : "";
+    state.photoIndex = Math.min(
+      flow().length,
+      Math.max(1, Number.parseInt(saved.photoIndex, 10) || 1),
+    );
+    state.step = state.photoIndex < flow().length ? "photos" : "details";
+    state.history = [];
+    return true;
+  }
   function finish() {
+    clearContinuation();
     state.history = [];
     state.step = "done";
+    shouldFocusStage = true;
     render();
   }
-  function setProgress(value) {
-    progress.style.width = `${Math.max(5, Math.min(100, value))}%`;
+  function setProgress(value, label = "Anfrage ausfüllen") {
+    const normalized = Math.max(5, Math.min(100, value));
+    progress.style.width = `${normalized}%`;
+    const progressBar = progress.parentElement;
+    progressBar?.setAttribute("aria-valuenow", String(normalized));
+    const progressLabel = root.querySelector("[data-progress-label]");
+    if (progressLabel) progressLabel.textContent = label;
   }
   function renderStage(html) {
+    releaseObjectUrls();
     stage.style.transition = "none";
     stage.style.opacity = "0";
     stage.innerHTML = html;
     void stage.offsetWidth;
     stage.style.transition = "opacity .22s ease";
     stage.style.opacity = "1";
+    if (shouldFocusStage) {
+      shouldFocusStage = false;
+      requestAnimationFrame(() => {
+        const target = stage.querySelector("h2, [data-stage-heading]") || stage;
+        target.setAttribute("tabindex", "-1");
+        target.focus({ preventScroll: false });
+      });
+    }
   }
   function push(next) {
     state.history.push({ step: state.step, photoIndex: state.photoIndex });
     state.step = next;
+    shouldFocusStage = true;
+    persistContinuation();
     render();
   }
   function goBack() {
@@ -224,11 +372,15 @@
     if (!last) return;
     state.step = last.step;
     state.photoIndex = last.photoIndex;
+    shouldFocusStage = true;
+    persistContinuation();
     render();
   }
   back.addEventListener("click", goBack);
 
   function chooseType(type) {
+    if (!VALID_TYPES.has(type)) return;
+    clearContinuation();
     state.type = type;
     state.classifiedType = null;
     state.photoIndex = 0;
@@ -238,10 +390,10 @@
   }
 
   function typeScreen() {
-    setProgress(8);
+    setProgress(8, "Kategorie auswählen");
     back.hidden = true;
     renderStage(
-      `<h2 class="wizard-title">Was möchten Sie anbieten?</h2><p class="wizard-copy">Wählen Sie einfach die passendste Kategorie. „Ich weiß es nicht“ ist völlig in Ordnung.</p><div class="choice-grid">${TYPES.map(([id, title, copy]) => `<button class="choice" data-type="${id}"><strong>${title}</strong><small>${copy}</small></button>`).join("")}</div>`,
+      `<p class="wizard-copy wizard-choice-intro" data-stage-heading>Wählen Sie einfach die passendste Kategorie. „Ich weiß es nicht“ ist völlig in Ordnung.</p><div class="choice-grid">${TYPES.map(([id, title, copy]) => `<button type="button" class="choice" data-type="${id}"><strong>${title}</strong><small>${copy}</small></button>`).join("")}</div>`,
     );
     stage
       .querySelectorAll("[data-type]")
@@ -272,7 +424,12 @@
     const pct = state.leadSaved
       ? 58 + Math.round((state.photoIndex / items.length) * 27)
       : 18;
-    setProgress(pct);
+    setProgress(
+      pct,
+      state.leadSaved
+        ? `Zusatzfoto ${state.photoIndex + 1} von ${items.length}`
+        : "Erstes Foto auswählen",
+    );
     back.hidden = false;
     const maxPhotos = 5;
     const accessoryCount = state.photos.filter((p) => p.kind === "accessories").length;
@@ -297,20 +454,8 @@
     const skipAction = state.leadSaved
       ? `<button type="button" class="ghost-button" data-skip>Diesen Schritt überspringen</button>`
       : "";
-    const accessoryPreview =
-      item[0] === "accessories"
-        ? accessoryCount > 0
-          ? `<div class="preview-thumbs">${state.photos
-              .filter((p) => p.kind === "accessories")
-              .map(
-                (p) =>
-                  `<img src="${URL.createObjectURL(p.file)}" alt="Ausgewähltes Foto" style="width:64px;height:64px;object-fit:cover;border-radius:6px;margin-right:8px;"/>`,
-              )
-              .join("")}</div><p class="photo-note">Insgesamt ausgewählt: ${accessoryCount}. Es sind noch ${remaining} Fotos möglich.</p>`
-          : `<p>Noch kein Foto aufgenommen.</p><p class="photo-note">Insgesamt ausgewählt: 0. Es sind noch ${remaining} Fotos möglich.</p>`
-        : `<p>Noch kein Foto aufgenommen.</p>`;
     renderStage(
-      `<div class="photo-step">${savedNotice}<div class="photo-step-header"><p class="eyebrow">${state.leadSaved ? "Ergänzendes Foto" : "Erstes Foto"} ${state.leadSaved ? `${state.photoIndex + 1} von ${items.length}` : ""}</p><div class="photo-progress-dots">${dots}</div></div><h2 class="wizard-title">${item[1]}</h2><p class="wizard-copy">${item[2]}</p>${saveNote}<div class="photo-step-grid"><div class="photo-instructions">${helpMarkup(item)}<div class="photo-frame"><input type="file" accept="image/*" capture="environment" data-camera-file hidden><input type="file" accept="image/*" ${allowMultiple ? "multiple" : ""} data-library-file hidden><div data-preview>${accessoryPreview}</div><div class="photo-actions"><button type="button" class="photo-button" data-camera>Foto aufnehmen</button><button type="button" class="ghost-button" data-library>Aus Mediathek wählen</button>${skipAction}</div><div data-quality role="status" aria-live="polite"></div></div></div></div>${early}</div>`,
+      `<div class="photo-step">${savedNotice}<div class="photo-step-header"><p class="eyebrow">${state.leadSaved ? "Ergänzendes Foto" : "Erstes Foto"} ${state.leadSaved ? `${state.photoIndex + 1} von ${items.length}` : ""}</p><div class="photo-progress-dots">${dots}</div></div><h2 class="wizard-title">${item[1]}</h2><p class="wizard-copy">${item[2]}</p>${saveNote}<div class="photo-step-grid"><div class="photo-instructions">${helpMarkup(item)}<div class="photo-frame"><input type="file" accept="image/*" capture="environment" data-camera-file hidden><input type="file" accept="image/*" ${allowMultiple ? "multiple" : ""} data-library-file hidden><div data-preview><p>Noch kein Foto aufgenommen.</p></div><div class="photo-actions"><button type="button" class="photo-button" data-camera>Foto aufnehmen</button><button type="button" class="ghost-button" data-library>Aus Mediathek wählen</button>${skipAction}</div><div data-quality role="status" aria-live="polite"></div></div></div></div>${early}</div>`,
     );
     const help = stage.querySelector("[data-help]");
     if (help) {
@@ -327,10 +472,49 @@
     }
     const cameraFile = stage.querySelector("[data-camera-file]");
     const libraryFile = stage.querySelector("[data-library-file]");
-    stage.querySelector("[data-camera]").onclick = () => {
+    const cameraButton = stage.querySelector("[data-camera]");
+    const libraryButton = stage.querySelector("[data-library]");
+    const quality = stage.querySelector("[data-quality]");
+    const preview = stage.querySelector("[data-preview]");
+    const setPhotoControlsBusy = (busy) => {
+      cameraButton.disabled = busy;
+      libraryButton.disabled = busy;
+      back.disabled = busy;
+    };
+    const renderAccessoryPreview = () => {
+      if (item[0] !== "accessories") return;
+      releaseObjectUrls();
+      clearElement(preview);
+      const accessoryPhotos = state.photos.filter(
+        (photo) => photo.kind === "accessories",
+      );
+      if (accessoryPhotos.length) {
+        const thumbnails = document.createElement("div");
+        thumbnails.className = "preview-thumbs";
+        accessoryPhotos.forEach((photo) => {
+          const image = document.createElement("img");
+          image.src = makeObjectUrl(photo.file);
+          image.alt = "Ausgewähltes Foto";
+          image.width = 64;
+          image.height = 64;
+          thumbnails.appendChild(image);
+        });
+        preview.appendChild(thumbnails);
+      } else {
+        const empty = document.createElement("p");
+        empty.textContent = "Noch kein Foto aufgenommen.";
+        preview.appendChild(empty);
+      }
+      const note = document.createElement("p");
+      note.className = "photo-note";
+      note.textContent = `Insgesamt ausgewählt: ${accessoryPhotos.length}. Noch ${Math.max(0, 5 - accessoryPhotos.length)} möglich.`;
+      preview.appendChild(note);
+    };
+    renderAccessoryPreview();
+    cameraButton.onclick = () => {
       cameraFile.click();
     };
-    stage.querySelector("[data-library]").onclick = () => {
+    libraryButton.onclick = () => {
       libraryFile.click();
     };
     const earlyButton = stage.querySelector("[data-early]");
@@ -343,6 +527,8 @@
     if (skipButton)
       skipButton.onclick = () => {
         state.photoIndex++;
+        shouldFocusStage = true;
+        persistContinuation();
         render();
       };
 
@@ -354,46 +540,48 @@
       const accessoryCount = state.photos.filter((p) => p.kind === "accessories").length;
       const allowedRemaining = maxPhotos - accessoryCount;
       if (allowedRemaining <= 0) {
-        const quality = stage.querySelector("[data-quality]");
-        quality.innerHTML =
-          '<div class="quality retry">Sie haben bereits 5 zusätzliche Fotos ausgewählt. Bitte fahren Sie mit dem aktuellen Upload fort.</div>';
+        showQuality(
+          quality,
+          "retry",
+          "Sie haben bereits 5 zusätzliche Fotos ausgewählt. Bitte fahren Sie mit dem aktuellen Upload fort.",
+        );
         return;
       }
 
       const toProcess = selectedFiles.slice(0, allowMultiple ? allowedRemaining : 1);
       if (toProcess.length < selectedFiles.length) {
-        const quality = stage.querySelector("[data-quality]");
-        quality.innerHTML =
-          '<div class="quality retry">Es werden nur maximal 5 Fotos insgesamt akzeptiert. Zusätzliche Dateien wurden entfernt.</div>';
+        showQuality(
+          quality,
+          "retry",
+          "Es werden nur maximal 5 Fotos insgesamt akzeptiert. Zusätzliche Dateien wurden entfernt.",
+        );
       }
 
-      const preview = stage.querySelector("[data-preview]");
-      const renderAccessoryPreview = () => {
-        const accessoryPhotos = state.photos.filter((p) => p.kind === "accessories");
-        const accessoryCount = accessoryPhotos.length;
-        preview.innerHTML = `<div class="preview-thumbs">${accessoryPhotos
-          .map(
-            (p) =>
-              `<img src="${URL.createObjectURL(p.file)}" alt="Ausgewähltes Foto" style="width:64px;height:64px;object-fit:cover;border-radius:6px;margin-right:8px;"/>`,
-          )
-          .join("")}</div><p class="photo-note">Insgesamt ausgewählt: ${accessoryCount}. Noch ${Math.max(0, 5 - accessoryCount)} möglich.</p>`;
-      };
-
       for (const selected of toProcess) {
+        if (!selected.type.startsWith("image/")) {
+          showQuality(quality, "retry", "Bitte wählen Sie eine Bilddatei aus.");
+          return;
+        }
         if (selected.size > 20 * 1024 * 1024) {
-          const quality = stage.querySelector("[data-quality]");
-          quality.innerHTML =
-            '<div class="quality retry">Mindestens ein Bild ist zu groß. Bitte wählen Sie normale Fotoaufnahmen.</div>';
+          showQuality(
+            quality,
+            "retry",
+            "Mindestens ein Bild ist zu groß. Bitte wählen Sie eine normale Fotoaufnahme bis 20 MB.",
+          );
           return;
         }
       }
 
       const skipPreview = item[0] === "accessories";
-      for (const selected of toProcess) {
-        await handlePhoto(selected, item, skipPreview);
-        if (item[0] === "accessories") {
-          renderAccessoryPreview();
+      setPhotoControlsBusy(true);
+      try {
+        for (const selected of toProcess) {
+          const accepted = await handlePhoto(selected, item, skipPreview);
+          if (item[0] === "accessories") renderAccessoryPreview();
+          if (!accepted) break;
         }
+      } finally {
+        if (quality.isConnected) setPhotoControlsBusy(false);
       }
     };
 
@@ -407,58 +595,83 @@
     };
   }
 
-  async function imageForCheck(file, max = 768) {
+  async function imageToJpeg(file, max, quality) {
+    let bitmap;
+    try {
+      bitmap = await createImageBitmap(file);
+      if (!bitmap.width || !bitmap.height) throw new Error("decode");
+      const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("canvas");
+      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      return await new Promise((resolve, reject) => {
+        canvas.toBlob(
+          (blob) => (blob ? resolve(blob) : reject(new Error("encode"))),
+          "image/jpeg",
+          quality,
+        );
+      });
+    } finally {
+      bitmap?.close?.();
+    }
+  }
+
+  async function imageDimensions(file) {
     const bitmap = await createImageBitmap(file);
-    const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(bitmap.width * scale);
-    canvas.height = Math.round(bitmap.height * scale);
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    return await new Promise((r) => canvas.toBlob(r, "image/jpeg", 0.72));
+    try {
+      if (!bitmap.width || !bitmap.height) throw new Error("decode");
+      return { width: bitmap.width, height: bitmap.height };
+    } finally {
+      bitmap.close?.();
+    }
+  }
+
+  async function imageForCheck(file, max = 768) {
+    return imageToJpeg(file, max, 0.72);
   }
 
   async function imageForStorage(file, max = 3000) {
-    const bitmap = await createImageBitmap(file);
-    const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(bitmap.width * scale);
-    canvas.height = Math.round(bitmap.height * scale);
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    return await new Promise((r) => canvas.toBlob(r, "image/jpeg", 0.88));
+    return imageToJpeg(file, max, 0.88);
   }
   async function localQuality(blob) {
     const bitmap = await createImageBitmap(blob);
-    const canvas = document.createElement("canvas");
-    canvas.width = 64;
-    canvas.height = 64;
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    ctx.drawImage(bitmap, 0, 0, 64, 64);
-    const d = ctx.getImageData(0, 0, 64, 64).data;
-    let sum = 0,
-      sum2 = 0;
-    for (let i = 0; i < d.length; i += 4) {
-      const y = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
-      sum += y;
-      sum2 += y * y;
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = 64;
+      canvas.height = 64;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) throw new Error("canvas");
+      ctx.drawImage(bitmap, 0, 0, 64, 64);
+      const d = ctx.getImageData(0, 0, 64, 64).data;
+      let sum = 0,
+        sum2 = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        const y = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+        sum += y;
+        sum2 += y * y;
+      }
+      const n = d.length / 4,
+        mean = sum / n,
+        variance = sum2 / n - mean * mean;
+      if (mean < 28)
+        return {
+          ok: false,
+          message:
+            "Das Foto ist sehr dunkel. Mit mehr Licht lassen sich Details besser erkennen.",
+        };
+      if (variance < 80)
+        return {
+          ok: false,
+          message:
+            "Auf dem Foto sind nur wenige Details erkennbar. Eine nähere oder hellere Aufnahme wäre besser.",
+        };
+      return { ok: true };
+    } finally {
+      bitmap.close?.();
     }
-    const n = d.length / 4,
-      mean = sum / n,
-      variance = sum2 / n - mean * mean;
-    if (mean < 28)
-      return {
-        ok: false,
-        message:
-          "Das Foto ist sehr dunkel. Bitte mit mehr Licht noch einmal aufnehmen.",
-      };
-    if (variance < 80)
-      return {
-        ok: false,
-        message:
-          "Auf dem Foto sind kaum Details erkennbar. Bitte näher oder mit besserem Licht fotografieren.",
-      };
-    return { ok: true };
   }
   async function aiCheck(blob, item) {
     if (!apiBase)
@@ -486,105 +699,238 @@
       return;
     }
     state.photoIndex++;
+    shouldFocusStage = true;
+    persistContinuation();
     render();
   }
+
+  function requestPhotoDecision(quality, preview, message) {
+    return new Promise((resolve) => {
+      showQuality(quality, "retry", message, [
+        {
+          label: "Foto trotzdem verwenden",
+          className: "continue-button",
+          onClick: () => resolve(true),
+        },
+        {
+          label: "Neues Foto wählen",
+          onClick: () => {
+            releaseObjectUrls();
+            clearElement(preview);
+            const empty = document.createElement("p");
+            empty.textContent = "Noch kein Foto aufgenommen.";
+            preview.appendChild(empty);
+            resolve(false);
+          },
+        },
+      ]);
+    });
+  }
+
+  function addAcceptedPhoto(selected, item, quality, message) {
+    state.photos.push({ file: selected, kind: item[0], label: item[1] });
+    showQuality(quality, "ok", message, [
+      {
+        label: "Weiter",
+        className: "continue-button",
+        onClick: advanceAfterAcceptedPhoto,
+      },
+    ]);
+  }
+
   async function handlePhoto(selected, item, skipPreview = false) {
     const preview = stage.querySelector("[data-preview]"),
       quality = stage.querySelector("[data-quality]");
     if (!skipPreview && item[0] !== "accessories") {
-      const url = URL.createObjectURL(selected);
-      preview.innerHTML = `<img src="${url}" alt="Vorschau des aufgenommenen Fotos">`;
+      releaseObjectUrls();
+      clearElement(preview);
+      const image = document.createElement("img");
+      image.src = makeObjectUrl(selected);
+      image.alt = "Vorschau des ausgewählten Fotos";
+      preview.appendChild(image);
     }
 
-    const bitmap = await createImageBitmap(selected);
-    const isSmallImage = Math.max(bitmap.width, bitmap.height) < 800;
-
-    quality.innerHTML = isSmallImage
-      ? '<div class="quality retry">Dieses Bild ist recht klein. Wenn möglich, fotografieren Sie das Instrument bitte noch einmal. Sie können das Bild aber trotzdem verwenden.</div>'
-      : '<div class="quality checking">Foto wird kurz geprüft …</div>';
+    showQuality(quality, "checking", "Foto wird kurz geprüft …");
+    let dimensions;
+    let small;
+    let local;
     try {
-      const small = await imageForCheck(selected);
-      const local = await localQuality(small);
-      if (!local.ok) {
-        quality.innerHTML = `<div class="quality retry">${local.message}</div>`;
-        return;
-      }
-      let result = { ok: true };
-      const disableAi = item[0] === "accessories" || state.photoIndex === flow().length - 1;
-      if (!disableAi && isAIType(state.type)) result = await aiCheck(small, item);
-      if (!result.ok) {
-        quality.innerHTML = `<div class="quality retry">${result.message || "Bitte noch einmal fotografieren."}</div>`;
-        return;
-      }
-      if (result.detected_type && state.type === "unknown") {
-        const mapped =
-          {
-            double_bass: "double_bass",
-            bow: "bow",
-            violin: "strings",
-            viola: "strings",
-            cello: "strings",
-            guitar: "guitar",
-            other: "other",
-          }[result.detected_type] || null;
-        state.classifiedType = mapped;
-      }
-      state.photos.push({ file: selected, kind: item[0], label: item[1] });
-      quality.innerHTML = `<div class="quality ok">✓ ${result.message || "Das Foto ist gut brauchbar."}</div><div class="photo-actions"><button class="continue-button" data-next>Weiter</button></div>`;
-      stage.querySelector("[data-next]").onclick = advanceAfterAcceptedPhoto;
-    } catch (e) {
-      quality.innerHTML =
-        '<div class="quality ok">Foto gespeichert. Die automatische Prüfung ist gerade nicht erreichbar – Sie können trotzdem fortfahren.</div><div class="photo-actions"><button class="continue-button" data-next>Weiter</button></div>';
-      state.photos.push({ file: selected, kind: item[0], label: item[1] });
-      stage.querySelector("[data-next]").onclick = advanceAfterAcceptedPhoto;
+      dimensions = await imageDimensions(selected);
+      small = await imageForCheck(selected);
+      local = await localQuality(small);
+    } catch (_) {
+      showQuality(
+        quality,
+        "retry",
+        "Dieses Bild konnte nicht gelesen werden. Bitte wählen Sie eine andere Fotoaufnahme.",
+      );
+      return false;
     }
+
+    const isSmallImage = Math.max(dimensions.width, dimensions.height) < 800;
+    if (!local.ok || isSmallImage) {
+      const warning = !local.ok
+        ? local.message
+        : "Dieses Bild ist recht klein. Eine größere Aufnahme wäre für die Prüfung hilfreicher.";
+      const accepted = await requestPhotoDecision(quality, preview, warning);
+      if (!accepted) return false;
+      addAcceptedPhoto(
+        selected,
+        item,
+        quality,
+        "Foto gespeichert. Sie können jetzt fortfahren.",
+      );
+      return true;
+    }
+
+    let result = { ok: true, message: "Das Foto ist gut brauchbar." };
+    const disableAi =
+      !state.consentAccepted ||
+      item[0] === "accessories" ||
+      state.photoIndex === flow().length - 1;
+    if (!disableAi && isAIType(state.type)) {
+      try {
+        result = await aiCheck(small, item);
+      } catch (_) {
+        addAcceptedPhoto(
+          selected,
+          item,
+          quality,
+          "Foto gespeichert. Die automatische Prüfung ist gerade nicht erreichbar – Sie können trotzdem fortfahren.",
+        );
+        return true;
+      }
+    }
+
+    const acceptedAfterWarning = !result || result.ok === false;
+    if (acceptedAfterWarning) {
+      const serverMessage =
+        typeof result?.message === "string" && result.message.trim()
+          ? result.message.trim().slice(0, 400)
+          : "Die Aufnahme könnte besser sein.";
+      const accepted = await requestPhotoDecision(quality, preview, serverMessage);
+      if (!accepted) return false;
+    }
+
+    if (result?.detected_type && state.type === "unknown") {
+      const mapped =
+        {
+          double_bass: "double_bass",
+          bow: "bow",
+          violin: "strings",
+          viola: "strings",
+          cello: "strings",
+          guitar: "guitar",
+          other: "other",
+        }[result.detected_type] || null;
+      state.classifiedType = mapped;
+    }
+    const successMessage = acceptedAfterWarning
+      ? "Foto wurde trotz des Hinweises gespeichert."
+      : typeof result?.message === "string" && result.message.trim()
+        ? result.message.trim().slice(0, 400)
+        : "Das Foto ist gut brauchbar.";
+    addAcceptedPhoto(selected, item, quality, successMessage);
+    return true;
   }
 
   function simpleScreen() {
-    setProgress(35);
+    setProgress(35, "Fotos und Angaben");
     back.hidden = false;
-    stage.innerHTML = `<h2 class="wizard-title">Fotos und kurze Angaben</h2><p class="wizard-copy">Laden Sie einfach ein oder mehrere aussagekräftige Bilder hoch.</p><div class="field"><label>Fotos</label><input type="file" accept="image/*" multiple data-simple-photos></div><div class="field"><label>Hersteller / Marke <span class="optional">optional</span></label><input data-maker></div><div class="field"><label>Was wissen Sie über das Instrument? <span class="optional">optional</span></label><textarea data-story placeholder="Zum Beispiel Alter, Herkunft, Nachlass, Modell oder Zustand."></textarea></div><button class="continue-button" data-next>Weiter</button>`;
-    stage.querySelector("[data-next]").onclick = () => {
+    renderStage(
+      '<h2 class="wizard-title">Fotos und kurze Angaben</h2><p class="wizard-copy">Laden Sie einfach ein oder mehrere aussagekräftige Bilder hoch.</p><form data-simple-form><div class="field"><label for="simple-photos">Fotos <span class="optional">optional</span></label><input id="simple-photos" name="photos" type="file" accept="image/*" multiple data-simple-photos></div><div class="field"><label for="simple-maker">Hersteller / Marke <span class="optional">optional</span></label><input id="simple-maker" name="maker" maxlength="160" autocomplete="off" data-maker></div><div class="field"><label for="simple-story">Was wissen Sie über das Instrument? <span class="optional">optional</span></label><textarea id="simple-story" name="story" maxlength="3000" data-story placeholder="Zum Beispiel Alter, Herkunft, Nachlass, Modell oder Zustand."></textarea></div><button type="submit" class="continue-button">Weiter</button><div data-simple-status role="status" aria-live="polite"></div></form>',
+    );
+    const form = stage.querySelector("[data-simple-form]");
+    const maker = stage.querySelector("[data-maker]");
+    const story = stage.querySelector("[data-story]");
+    maker.value = state.data.maker || "";
+    story.value = state.data.story || "";
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
       const fs = stage.querySelector("[data-simple-photos]").files;
-      state.photos = [...fs].map((file, i) => ({
+      const files = [...fs].slice(0, 8);
+      const invalidFile = files.find(
+        (file) => !file.type.startsWith("image/") || file.size > 20 * 1024 * 1024,
+      );
+      if (invalidFile || fs.length > 8) {
+        showQuality(
+          stage.querySelector("[data-simple-status]"),
+          "retry",
+          fs.length > 8
+            ? "Bitte wählen Sie höchstens 8 Fotos aus."
+            : "Bitte wählen Sie Bilddateien mit höchstens 20 MB pro Foto aus.",
+        );
+        return;
+      }
+      state.photos = files.map((file, i) => ({
         file,
         kind: `photo_${i + 1}`,
         label: "Foto",
       }));
-      state.data.maker = stage.querySelector("[data-maker]").value;
-      state.data.story = stage.querySelector("[data-story]").value;
+      state.data.maker = maker.value.trim();
+      state.data.story = story.value.trim();
       push("contact");
-    };
+    });
   }
 
   function detailsScreen() {
-    setProgress(state.leadSaved ? 90 : 72);
+    setProgress(state.leadSaved ? 90 : 72, "Freiwillige Angaben");
     back.hidden = false;
     const pendingPhotoCount = Math.max(
       0,
       state.photos.length - state.uploadedPhotoCount,
     );
     const savedCopy = state.leadSaved
-      ? `<div class="saved-confirmation compact"><strong>Ihre Anfrage ist bereits gespeichert.</strong><span>${pendingPhotoCount ? `${pendingPhotoCount} ergänzende Foto(s) werden jetzt hinzugefügt.` : "Diese Angaben sind freiwillig."}</span></div>`
+      ? '<div class="saved-confirmation compact"><strong>Ihre Anfrage ist bereits gespeichert.</strong><span data-pending-copy></span></div>'
       : "";
-    stage.innerHTML = `${savedCopy}<h2 class="wizard-title">Was wissen Sie darüber?</h2><p class="wizard-copy">Ein paar Sätze helfen. Wenn Sie nichts wissen, lassen Sie die Felder einfach leer.</p><div class="field"><label>Geschichte / Herkunft <span class="optional">optional</span></label><textarea data-story placeholder="Zum Beispiel: aus dem Nachlass meines Onkels, der Berufsmusiker war …">${state.data.story || ""}</textarea></div><div class="field"><label>Hersteller oder Name <span class="optional">optional</span></label><input data-maker value="${state.data.maker || ""}" placeholder="Unbekannt ist völlig in Ordnung"></div><button class="continue-button" data-next>${state.leadSaved ? "Ergänzungen senden" : "Weiter"}</button><div data-submit-status role="status" aria-live="polite"></div>`;
-    stage.querySelector("[data-next]").onclick = async () => {
-      state.data.story = stage.querySelector("[data-story]").value;
-      state.data.maker = stage.querySelector("[data-maker]").value;
-      if (state.leadSaved) await submitContinuation();
+    renderStage(
+      `${savedCopy}<h2 class="wizard-title">Was wissen Sie darüber?</h2><p class="wizard-copy">Ein paar Sätze helfen. Wenn Sie nichts wissen, lassen Sie die Felder einfach leer.</p><form data-details-form><div class="field"><label for="instrument-story">Geschichte / Herkunft <span class="optional">optional</span></label><textarea id="instrument-story" name="story" maxlength="3000" data-story placeholder="Zum Beispiel: aus dem Nachlass meines Onkels, der Berufsmusiker war …"></textarea></div><div class="field"><label for="instrument-maker">Hersteller oder Name <span class="optional">optional</span></label><input id="instrument-maker" name="maker" maxlength="160" autocomplete="off" data-maker placeholder="Unbekannt ist völlig in Ordnung"></div><button type="submit" class="continue-button" data-next>${state.leadSaved ? "Ergänzungen senden" : "Weiter"}</button><div data-submit-status role="status" aria-live="polite"></div></form>`,
+    );
+    const story = stage.querySelector("[data-story]");
+    const maker = stage.querySelector("[data-maker]");
+    story.value = state.data.story || "";
+    maker.value = state.data.maker || "";
+    const pendingCopy = stage.querySelector("[data-pending-copy]");
+    if (pendingCopy)
+      pendingCopy.textContent = pendingPhotoCount
+        ? `${pendingPhotoCount} ergänzende Foto(s) werden jetzt hinzugefügt.`
+        : "Diese Angaben sind freiwillig.";
+    stage.querySelector("[data-details-form]").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      state.data.story = story.value.trim();
+      state.data.maker = maker.value.trim();
+      persistContinuation();
+      if (state.leadSaved)
+        await submitContinuation(stage.querySelector("[data-next]"));
       else push("contact");
-    };
+    });
   }
 
   function contactScreen() {
     const initialGuided = isInitialGuidedRequest();
-    setProgress(initialGuided ? 44 : 88);
+    setProgress(initialGuided ? 44 : 88, "Kontaktdaten und Zustimmung");
     back.hidden = initialGuided;
     const copy = initialGuided
       ? "Ein Foto reicht für den Anfang. Speichern Sie die Anfrage jetzt zwischen. Anschließend führen wir Sie direkt durch die weiteren, freiwilligen Fotoaufnahmen."
       : "Ihre Fotos und Angaben werden anschließend persönlich angesehen.";
-    stage.innerHTML = `<h2 class="wizard-title">Wie dürfen wir Sie erreichen?</h2><p class="wizard-copy">${copy}</p><div class="field"><label>Name</label><input data-name value="${state.data.name || ""}"></div><div class="field"><label>E-Mail</label><input type="email" data-email value="${state.data.email || ""}" required></div><div class="field"><label>Telefon <span class="optional">optional</span></label><input type="tel" data-phone value="${state.data.phone || ""}"></div><div class="field"><label>Ort / Region <span class="optional">optional</span></label><input data-city value="${state.data.city || ""}" placeholder="z. B. Hamburg"></div><label class="mini-note"><input type="checkbox" data-consent> Ich stimme zu, dass meine Angaben und Fotos zur Bearbeitung der Anfrage verarbeitet werden.</label><div class="wizard-summary"><strong>${state.photos.length} Foto(s) ausgewählt</strong><span>${TYPES.find((t) => t[0] === state.type)?.[1] || "Instrument"}</span></div><button class="submit-button" data-submit>${initialGuided ? "Zwischenspeichern und weiter" : "Anfrage senden"}</button><div data-submit-status role="status" aria-live="polite"></div>`;
-    stage.querySelector("[data-submit]").onclick = submit;
+    renderStage(
+      `<h2 class="wizard-title">Wie dürfen wir Sie erreichen?</h2><p class="wizard-copy">${copy}</p><form data-contact-form><div class="field"><label for="contact-name">Name <span class="optional">optional</span></label><input id="contact-name" name="name" maxlength="160" autocomplete="name" data-name></div><div class="field"><label for="contact-email">E-Mail</label><input id="contact-email" name="email" type="email" inputmode="email" maxlength="254" autocomplete="email" spellcheck="false" data-email required></div><div class="field"><label for="contact-phone">Telefon <span class="optional">optional</span></label><input id="contact-phone" name="phone" type="tel" maxlength="80" autocomplete="tel" data-phone></div><div class="field"><label for="contact-city">Ort / Region <span class="optional">optional</span></label><input id="contact-city" name="city" maxlength="120" autocomplete="address-level2" data-city placeholder="z. B. Hamburg"></div><div class="consent-field"><input id="contact-consent" name="consent" type="checkbox" data-consent required aria-describedby="privacy-note"><label for="contact-consent">Ich stimme zu, dass meine Angaben und Fotos zur Bearbeitung der Anfrage verarbeitet werden.</label></div><p class="mini-note" id="privacy-note">Weitere Informationen stehen in der <a href="/datenschutz/" target="_blank" rel="noopener">Datenschutzerklärung</a>.</p><div class="wizard-summary"><strong data-photo-summary></strong><span data-type-summary></span></div><button type="submit" class="submit-button" data-submit>${initialGuided ? "Zwischenspeichern und weiter" : "Anfrage senden"}</button><div data-submit-status role="status" aria-live="polite"></div></form>`,
+    );
+    const form = stage.querySelector("[data-contact-form]");
+    const values = {
+      "[data-name]": state.data.name,
+      "[data-email]": state.data.email,
+      "[data-phone]": state.data.phone,
+      "[data-city]": state.data.city,
+    };
+    Object.entries(values).forEach(([selector, value]) => {
+      stage.querySelector(selector).value = value || "";
+    });
+    stage.querySelector("[data-photo-summary]").textContent =
+      `${state.photos.length} Foto(s) ausgewählt`;
+    stage.querySelector("[data-type-summary]").textContent =
+      TYPES.find(([type]) => type === state.type)?.[1] || "Instrument";
+    form.addEventListener("submit", submit);
   }
 
   async function appendPhotos(formData, photos) {
@@ -607,8 +953,10 @@
   }
 
   function markInitialLeadSaved(result) {
-    state.leadId = result.id;
-    state.continuationToken = result.continuation_token || null;
+    state.leadId = String(result.id || "").slice(0, 160);
+    state.continuationToken = result.continuation_token
+      ? String(result.continuation_token).slice(0, 512)
+      : null;
     state.leadSaved = true;
     state.uploadedPhotoCount = state.photos.length;
     state.photoIndex = 1;
@@ -616,17 +964,23 @@
     if (state.continuationToken)
       state.step = state.photoIndex < flow().length ? "photos" : "details";
     else state.step = "saved";
+    shouldFocusStage = true;
+    persistContinuation();
     render();
   }
 
-  async function submit() {
-    const status = stage.querySelector("[data-submit-status]");
-    const email = stage.querySelector("[data-email]").value.trim();
-    if (!email || !stage.querySelector("[data-consent]").checked) {
-      status.innerHTML =
-        '<div class="quality retry">Bitte E-Mail und Zustimmung ergänzen.</div>';
+  async function submit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    if (state.isSubmitting) return;
+    if (!form.checkValidity()) {
+      form.reportValidity();
       return;
     }
+    const status = stage.querySelector("[data-submit-status]");
+    const submitButton = stage.querySelector("[data-submit]");
+    const email = stage.querySelector("[data-email]").value.trim();
+    const consent = stage.querySelector("[data-consent]").checked;
     state.data = {
       ...state.data,
       name: stage.querySelector("[data-name]").value.trim(),
@@ -634,30 +988,31 @@
       phone: stage.querySelector("[data-phone]").value.trim(),
       city: stage.querySelector("[data-city]").value.trim(),
     };
-    status.innerHTML =
-      '<div class="quality checking">Anfrage wird übermittelt …</div>';
+    state.consentAccepted = consent;
+    state.consentAt ||= new Date().toISOString();
+    state.requestKey ||= createRequestKey();
+    state.isSubmitting = true;
+    form.setAttribute("aria-busy", "true");
+    setButtonBusy(
+      submitButton,
+      true,
+      isInitialGuidedRequest() ? "Wird zwischengespeichert …" : "Wird gesendet …",
+    );
+    back.disabled = true;
+    showQuality(status, "checking", "Anfrage wird sicher übermittelt …");
     const initialGuided = isInitialGuidedRequest();
-    if (!apiBase) {
-      state.demoStorageKey = `demo-lead-${Date.now()}`;
-      localStorage.setItem(
-        state.demoStorageKey,
-        JSON.stringify({
-          type: state.type,
-          classifiedType: state.classifiedType,
-          data: state.data,
-          photoCount: state.photos.length,
-          createdAt: new Date().toISOString(),
-        }),
-      );
-      if (initialGuided)
-        markInitialLeadSaved({
-          id: state.demoStorageKey,
-          continuation_token: "demo",
-        });
-      else finish();
-      return;
-    }
     try {
+      if (!apiBase) {
+        state.demoStorageKey = `demo-lead-${Date.now()}`;
+        state.leadId = state.demoStorageKey;
+        if (initialGuided)
+          markInitialLeadSaved({
+            id: state.demoStorageKey,
+            continuation_token: "demo",
+          });
+        else finish();
+        return;
+      }
       const fd = new FormData();
       fd.append(
         "meta",
@@ -669,58 +1024,78 @@
             kind: p.kind,
             label: p.label,
           })),
+          consent: {
+            accepted: true,
+            version: "2026-08-24",
+            at: state.consentAt,
+          },
         }),
       );
       await appendPhotos(fd, state.photos);
       const res = await fetch(`${apiBase}/api/leads`, {
         method: "POST",
+        headers: { "Idempotency-Key": state.requestKey },
         body: fd,
       });
       if (!res.ok) throw new Error();
       const result = await res.json();
+      if (!result?.id) throw new Error("missing_id");
+      state.leadId = String(result.id).slice(0, 160);
+      if (["pending", "partial"].includes(result.processing_status)) {
+        showQuality(
+          status,
+          "retry",
+          result.processing_status === "pending"
+            ? "Ihre Anfrage ist angekommen und wird noch verarbeitet. Bitte versuchen Sie es gleich noch einmal; es wird keine doppelte Anfrage angelegt."
+            : "Ihre Kontaktdaten sind gespeichert, aber mindestens ein Foto wurde noch nicht vollständig übertragen. Bitte versuchen Sie es noch einmal.",
+        );
+        return;
+      }
       if (initialGuided) markInitialLeadSaved(result);
       else finish();
-    } catch (e) {
-      status.innerHTML =
-        '<div class="quality retry">Die Übermittlung hat nicht geklappt. Bitte versuchen Sie es noch einmal.</div>';
+    } catch (_) {
+      showQuality(
+        status,
+        "retry",
+        "Die Übermittlung hat nicht geklappt. Ihre Eingaben bleiben erhalten – bitte versuchen Sie es noch einmal.",
+      );
+    } finally {
+      state.isSubmitting = false;
+      form.removeAttribute("aria-busy");
+      setButtonBusy(submitButton, false, "");
+      back.disabled = false;
     }
   }
 
-  async function submitContinuation() {
+  async function submitContinuation(submitButton) {
+    if (state.isSubmitting) return;
     const status = stage.querySelector("[data-submit-status]");
     const pendingPhotos = state.photos.slice(state.uploadedPhotoCount);
-    status.innerHTML =
-      '<div class="quality checking">Ergänzungen werden übermittelt …</div>';
-
-    if (!apiBase || state.continuationToken === "demo") {
-      if (state.demoStorageKey) {
-        const existing = JSON.parse(
-          localStorage.getItem(state.demoStorageKey) || "{}",
-        );
-        localStorage.setItem(
-          state.demoStorageKey,
-          JSON.stringify({
-            ...existing,
-            classifiedType: state.classifiedType,
-            data: state.data,
-            photoCount: state.photos.length,
-          }),
-        );
-      }
-      state.uploadedPhotoCount = state.photos.length;
-      finish();
-      return;
-    }
-
+    state.isSubmitting = true;
+    setButtonBusy(submitButton, true, "Ergänzungen werden gesendet …");
+    back.disabled = true;
+    showQuality(status, "checking", "Ergänzungen werden übermittelt …");
     if (!state.leadId || !state.continuationToken) {
-      status.innerHTML =
-        '<div class="quality retry">Ihre Anfrage ist gespeichert. Zusätzliche Angaben können gerade nicht ergänzt werden.</div><div class="photo-actions"><button class="ghost-button" type="button" data-finish>Für jetzt fertig</button></div>';
-      stage.querySelector("[data-finish]").onclick = finish;
+      showQuality(
+        status,
+        "retry",
+        "Ihre Anfrage ist gespeichert. Zusätzliche Angaben können gerade nicht ergänzt werden.",
+        [{ label: "Für jetzt fertig", onClick: finish }],
+      );
+      state.isSubmitting = false;
+      setButtonBusy(submitButton, false, "");
+      back.disabled = false;
       return;
     }
 
     try {
+      if (!apiBase || state.continuationToken === "demo") {
+        state.uploadedPhotoCount = state.photos.length;
+        finish();
+        return;
+      }
       const fd = new FormData();
+      state.continuationRequestKey ||= createRequestKey();
       fd.append(
         "meta",
         JSON.stringify({
@@ -740,22 +1115,45 @@
         `${apiBase}/api/leads/${encodeURIComponent(state.leadId)}/continue`,
         {
           method: "POST",
-          headers: { Authorization: `Bearer ${state.continuationToken}` },
+          headers: {
+            Authorization: `Bearer ${state.continuationToken}`,
+            "Idempotency-Key": state.continuationRequestKey,
+          },
           body: fd,
         },
       );
       if (!res.ok) throw new Error();
+      const result = await res.json().catch(() => ({}));
+      if (["pending", "partial"].includes(result.processing_status)) {
+        showQuality(
+          status,
+          "retry",
+          result.processing_status === "pending"
+            ? "Die Ergänzungen werden noch verarbeitet. Bitte versuchen Sie es gleich erneut; doppelte Fotos werden dabei verhindert."
+            : "Mindestens ein Foto wurde noch nicht vollständig übertragen. Bitte versuchen Sie es erneut oder schließen Sie für jetzt ab.",
+          [{ label: "Für jetzt fertig", onClick: finish }],
+        );
+        return;
+      }
+      state.continuationRequestKey = null;
       state.uploadedPhotoCount = state.photos.length;
       finish();
-    } catch (e) {
-      status.innerHTML =
-        '<div class="quality retry">Ihre ursprüngliche Anfrage ist bereits gespeichert. Die Ergänzungen konnten noch nicht übertragen werden. Bitte versuchen Sie es erneut oder schließen Sie für jetzt ab.</div><div class="photo-actions"><button class="ghost-button" type="button" data-finish>Für jetzt fertig</button></div>';
-      stage.querySelector("[data-finish]").onclick = finish;
+    } catch (_) {
+      showQuality(
+        status,
+        "retry",
+        "Ihre ursprüngliche Anfrage ist bereits gespeichert. Die Ergänzungen konnten noch nicht übertragen werden. Sie können es erneut versuchen oder für jetzt abschließen.",
+        [{ label: "Für jetzt fertig", onClick: finish }],
+      );
+    } finally {
+      state.isSubmitting = false;
+      setButtonBusy(submitButton, false, "");
+      back.disabled = false;
     }
   }
 
   function savedScreen() {
-    setProgress(54);
+    setProgress(54, "Anfrage zwischengespeichert");
     back.hidden = true;
     const hasMorePhotoSteps = state.photoIndex < flow().length;
     const canContinue = Boolean(state.continuationToken);
@@ -764,7 +1162,7 @@
       : "Weitere Angaben ergänzen";
     const unavailable = canContinue
       ? ""
-      : '<div class="quality retry continuation-unavailable">Der ergänzende Upload ist in dieser Vorschau noch nicht verbunden. Die Anfrage selbst wurde gespeichert.</div>';
+      : '<div class="quality retry continuation-unavailable">Weitere Fotos können gerade nicht ergänzt werden. Ihre ursprüngliche Anfrage ist trotzdem sicher gespeichert.</div>';
     renderStage(
       `<div class="saved-confirmation"><span class="saved-check" aria-hidden="true">✓</span><div><p class="eyebrow">Zwischengespeichert</p><h2 class="wizard-title">Der erste Schritt ist geschafft.</h2><p class="wizard-copy">Ihr erstes Foto und Ihre Kontaktdaten sind sicher gespeichert. Laden Sie jetzt nach Möglichkeit weitere Ansichten hoch – sie helfen uns bei der persönlichen Prüfung.</p></div></div><div class="saved-actions"><button class="continue-button" type="button" data-continue ${canContinue ? "" : "disabled aria-disabled=\"true\""}>${primaryLabel}</button>${unavailable}<button class="ghost-button" type="button" data-finish>Ohne weitere Fotos abschließen</button></div>`,
     );
@@ -773,16 +1171,29 @@
       continueButton.onclick = () => {
         state.history.push({ step: "saved", photoIndex: state.photoIndex });
         state.step = hasMorePhotoSteps ? "photos" : "details";
+        shouldFocusStage = true;
+        persistContinuation();
         render();
       };
     stage.querySelector("[data-finish]").onclick = finish;
   }
 
   function doneScreen() {
-    setProgress(100);
+    setProgress(100, "Anfrage vollständig gesendet");
     back.hidden = true;
-    stage.innerHTML =
-      '<p class="eyebrow">Fertig</p><h2 class="wizard-title">Vielen Dank.</h2><p class="wizard-copy">Ihre Anfrage ist angekommen. Die Fotos und Angaben werden persönlich angesehen. Wir melden uns anschließend bei Ihnen.</p><a class="button secondary" href="/">Zur Startseite</a>';
+    renderStage(
+      '<div class="saved-confirmation"><span class="saved-check" aria-hidden="true">✓</span><div><p class="eyebrow">Anfrage angekommen</p><h2 class="wizard-title">Vielen Dank.</h2><p class="wizard-copy">Ihre Fotos und Angaben werden persönlich angesehen. Wir melden uns anschließend über Ihre angegebenen Kontaktdaten.</p></div></div><div class="done-details"><p data-confirm-contact hidden></p><p data-confirm-reference hidden></p><p>Sie können diese Seite jetzt schließen oder zur Startseite zurückkehren.</p></div><a class="button secondary" href="/">Zur Startseite</a>',
+    );
+    const contact = stage.querySelector("[data-confirm-contact]");
+    if (state.data.email) {
+      contact.textContent = `Kontakt für die Rückmeldung: ${state.data.email}`;
+      contact.hidden = false;
+    }
+    const reference = stage.querySelector("[data-confirm-reference]");
+    if (state.leadId && !String(state.leadId).startsWith("demo-lead-")) {
+      reference.textContent = `Vorgangsnummer: ${String(state.leadId).slice(0, 160)}`;
+      reference.hidden = false;
+    }
   }
   function render() {
     back.hidden = state.history.length === 0;
@@ -794,9 +1205,11 @@
     if (state.step === "saved") return savedScreen();
     if (state.step === "done") return doneScreen();
   }
-  if (state.type && TYPES.some((t) => t[0] === state.type)) {
+  const restored = restoreContinuation();
+  if (!restored && state.type) {
     state.step = isAIType(state.type) ? "photos" : "simple";
     state.history = [{ step: "type", photoIndex: 0 }];
   }
+  window.addEventListener("pagehide", releaseObjectUrls);
   render();
 })();

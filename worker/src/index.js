@@ -10,6 +10,151 @@ const DEFAULT_ALLOWED_ORIGINS = [
   "https://www.musikinstrument-ankauf.de",
 ];
 
+const ALLOWED_IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+const ALLOWED_INSTRUMENT_TYPES = new Set([
+  "double_bass",
+  "bow",
+  "strings",
+  "guitar",
+  "estate",
+  "unknown",
+  "other",
+]);
+const CONSENT_VERSION = "2026-08-24";
+const LEGACY_SUBMISSION_HARD_END = Date.parse("2026-09-08T00:00:00.000Z");
+const CONSENT_MAX_AGE_MS = 72 * 60 * 60 * 1000;
+const CONSENT_FUTURE_SKEW_MS = 5 * 60 * 1000;
+const STALE_UPLOAD_MS = 10 * 60 * 1000;
+const JOURNAL_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+const MAX_PHOTOS_PER_REQUEST = 8;
+const MAX_PHOTOS_PER_LEAD = 12;
+const MAX_ORIGINAL_BYTES = 10 * 1024 * 1024;
+const MAX_THUMBNAIL_BYTES = 1024 * 1024;
+const MAX_AI_IMAGE_BYTES = 2 * 1024 * 1024;
+const MAX_PHOTO_CHECK_BYTES = 2 * 1024 * 1024;
+const MAX_LEAD_REQUEST_BYTES = 40 * 1024 * 1024;
+const MAX_PHOTO_CHECK_REQUEST_BYTES = 3 * 1024 * 1024;
+
+class ApiError extends Error {
+  constructor(status, code, headers = {}) {
+    super(code);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+    this.headers = headers;
+  }
+}
+
+function apiError(status, code, headers) {
+  throw new ApiError(status, code, headers);
+}
+
+function boundedText(value, maxLength, field, { required = false } = {}) {
+  const text = String(value ?? "").replace(/\0/g, "").trim();
+  if (required && !text) apiError(400, `${field}_missing`);
+  if (text.length > maxLength) apiError(413, `${field}_too_long`);
+  return text;
+}
+
+function validEmail(value) {
+  return (
+    value.length <= 320 &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(value) &&
+    !/[\r\n]/.test(value)
+  );
+}
+
+function isAllowedOrigin(request, env) {
+  const origin = request.headers.get("Origin") || "";
+  return Boolean(origin) && getAllowedOrigins(env).has(origin);
+}
+
+function requirePublicWriteOrigin(request, env) {
+  if (!isAllowedOrigin(request, env)) apiError(403, "origin_not_allowed");
+}
+
+function assertContentLength(request, maxBytes) {
+  const raw = request.headers.get("Content-Length");
+  if (!raw) return;
+  const size = Number(raw);
+  if (!Number.isFinite(size) || size < 0) apiError(400, "invalid_length");
+  if (size > maxBytes) apiError(413, "request_too_large");
+}
+
+async function readMultipart(request, maxBytes) {
+  assertContentLength(request, maxBytes);
+  const contentType = request.headers.get("Content-Type") || "";
+  if (!contentType.toLowerCase().startsWith("multipart/form-data;"))
+    apiError(415, "multipart_required");
+  let formData;
+  try {
+    formData = await request.formData();
+  } catch {
+    apiError(400, "invalid_multipart");
+  }
+  let total = 0;
+  const encoder = new TextEncoder();
+  for (const [, value] of formData.entries()) {
+    total += value instanceof File ? value.size : encoder.encode(value).length;
+    if (total > maxBytes) apiError(413, "request_too_large");
+  }
+  return formData;
+}
+
+function imageSignatureMatches(bytes, type) {
+  if (type === "image/jpeg")
+    return bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  if (type === "image/png")
+    return (
+      bytes[0] === 0x89 &&
+      bytes[1] === 0x50 &&
+      bytes[2] === 0x4e &&
+      bytes[3] === 0x47 &&
+      bytes[4] === 0x0d &&
+      bytes[5] === 0x0a &&
+      bytes[6] === 0x1a &&
+      bytes[7] === 0x0a
+    );
+  if (type === "image/webp")
+    return (
+      bytes[0] === 0x52 &&
+      bytes[1] === 0x49 &&
+      bytes[2] === 0x46 &&
+      bytes[3] === 0x46 &&
+      bytes[8] === 0x57 &&
+      bytes[9] === 0x45 &&
+      bytes[10] === 0x42 &&
+      bytes[11] === 0x50
+    );
+  return false;
+}
+
+async function validateImageFile(file, maxBytes, code = "invalid_photo") {
+  if (!(file instanceof File)) apiError(400, code);
+  const type = String(file.type || "").toLowerCase();
+  if (!ALLOWED_IMAGE_TYPES.has(type)) apiError(415, `${code}_type`);
+  if (!file.size) apiError(400, `${code}_empty`);
+  if (file.size > maxBytes) apiError(413, `${code}_too_large`);
+  const signature = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+  if (!imageSignatureMatches(signature, type))
+    apiError(415, `${code}_signature`);
+}
+
+async function sha256(value) {
+  return sha256Bytes(new TextEncoder().encode(value));
+}
+
+async function sha256Bytes(value) {
+  const bytes = new Uint8Array(
+    await crypto.subtle.digest("SHA-256", value),
+  );
+  return base64Url(bytes);
+}
+
 function getAllowedOrigins(env) {
   const allowed = new Set(DEFAULT_ALLOWED_ORIGINS);
   const configured = [env.ALLOWED_ORIGIN, env.ALLOWED_ORIGINS]
@@ -25,23 +170,22 @@ function getAllowedOrigins(env) {
 function cors(request, env) {
   const origin = request.headers.get("Origin") || "";
   const allowedOrigins = getAllowedOrigins(env);
-  const localDevelopmentOrigin = /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(
-    origin,
-  );
   const headers = {
     "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type,Authorization",
+    "Access-Control-Allow-Headers":
+      "Content-Type,Authorization,Idempotency-Key",
+    "Access-Control-Max-Age": "86400",
     Vary: "Origin",
   };
 
-  if (allowedOrigins.has(origin) || localDevelopmentOrigin) {
+  if (allowedOrigins.has(origin)) {
     headers["Access-Control-Allow-Origin"] = origin;
   }
 
   return headers;
 }
 
-function json(data, status = 200, request = null, env = null) {
+function json(data, status = 200, request = null, env = null, extraHeaders = {}) {
   let req = null;
   let environment = null;
 
@@ -57,7 +201,10 @@ function json(data, status = 200, request = null, env = null) {
 
   const headers = {
     "content-type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff",
     ...(req && environment ? cors(req, environment) : {}),
+    ...extraHeaders,
   };
 
   return new Response(JSON.stringify(data), {
@@ -70,7 +217,10 @@ function id(prefix = "ANK") {
 }
 
 function continuationSecret(env) {
-  return env.UPLOAD_TOKEN_SECRET || env.OPENAI_API_KEY || "";
+  // Never reuse an unrelated credential as a signing key. If the dedicated
+  // secret is missing, initial leads are still accepted, but continuation is
+  // deliberately disabled until UPLOAD_TOKEN_SECRET is configured.
+  return env.UPLOAD_TOKEN_SECRET || "";
 }
 
 function base64Url(bytes) {
@@ -141,80 +291,560 @@ async function validContinuationToken(env, leadId, token) {
   }
 }
 
-function sortedFiles(formData, prefix) {
-  return [...formData.entries()]
-    .filter(([key, value]) => key.startsWith(prefix) && value instanceof File)
-    .sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }));
+async function enforceRateLimit(
+  request,
+  env,
+  scope,
+  limit,
+  windowSeconds,
+) {
+  const origin = request.headers.get("Origin") || "unknown";
+  const forwarded = (request.headers.get("X-Forwarded-For") || "")
+    .split(",")[0]
+    .trim();
+  const client =
+    request.headers.get("CF-Connecting-IP") || forwarded || "unknown";
+  const identityHash = await sha256(`${scope}\n${origin}\n${client}`);
+  const now = Math.floor(Date.now() / 1000);
+  const windowStart = Math.floor(now / windowSeconds) * windowSeconds;
+  const expiresAt = windowStart + windowSeconds * 2;
+  const { results = [] } = await env.LEADS.prepare(
+    `INSERT INTO api_rate_limits
+      (scope,identity_hash,window_start,count,expires_at)
+     VALUES (?,?,?,?,?)
+     ON CONFLICT(scope,identity_hash,window_start)
+     DO UPDATE SET count=count+1,expires_at=excluded.expires_at
+     RETURNING count`,
+  )
+    .bind(scope, identityHash, windowStart, 1, expiresAt)
+    .all();
+  const count = Number(results[0]?.count || 1);
+  if (Math.random() < 0.02)
+    await env.LEADS.prepare(`DELETE FROM api_rate_limits WHERE expires_at < ?`)
+      .bind(now)
+      .run();
+  if (count > limit) {
+    const retryAfter = Math.max(1, windowStart + windowSeconds - now);
+    apiError(429, "rate_limited", { "Retry-After": String(retryAfter) });
+  }
 }
 
-async function storePhotos(
+function parseJsonField(formData, field = "meta") {
+  const raw = formData.get(field);
+  if (typeof raw !== "string" || !raw || raw.length > 24000)
+    apiError(400, `${field}_invalid`);
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+      apiError(400, `${field}_invalid`);
+    return parsed;
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    apiError(400, `${field}_invalid`);
+  }
+}
+
+function normalizePhotoMeta(value, photoCount) {
+  if (value == null) return [];
+  if (!Array.isArray(value) || value.length > photoCount)
+    apiError(400, "photo_meta_invalid");
+  return value.map((item) => ({
+    kind: boundedText(item?.kind, 80, "photo_kind"),
+    label: boundedText(item?.label, 200, "photo_label"),
+  }));
+}
+
+function legacySubmissionAllowed(env) {
+  // Compatibility is fail-closed. It can only be enabled deliberately during
+  // the short cache-rollout window and becomes impossible after the hard end.
+  return (
+    env.ALLOW_LEGACY_LEAD_SUBMISSIONS === "true" &&
+    Date.now() <= LEGACY_SUBMISSION_HARD_END
+  );
+}
+
+function normalizeInitialMeta(raw, created, { allowLegacy = false } = {}) {
+  const type = boundedText(raw.type, 40, "type", { required: true });
+  if (!ALLOWED_INSTRUMENT_TYPES.has(type)) apiError(400, "type_invalid");
+  const classifiedType = boundedText(
+    raw.classifiedType,
+    40,
+    "classified_type",
+  );
+  if (classifiedType && !ALLOWED_INSTRUMENT_TYPES.has(classifiedType))
+    apiError(400, "classified_type_invalid");
+  const data = raw.data && typeof raw.data === "object" ? raw.data : {};
+  const email = boundedText(data.email, 320, "email", { required: true });
+  if (!validEmail(email)) apiError(400, "email_invalid");
+
+  let consentAt;
+  let consentVersion;
+  if (allowLegacy && raw.consent === undefined) {
+    consentAt = created;
+    consentVersion = "legacy-ui-implicit-v1";
+  } else {
+    const consent = raw.consent;
+    const consentTime =
+      typeof consent?.at === "string" &&
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u.test(consent.at)
+        ? Date.parse(consent.at)
+        : Number.NaN;
+    const now = Date.now();
+    if (
+      !consent ||
+      typeof consent !== "object" ||
+      Array.isArray(consent) ||
+      consent.accepted !== true ||
+      consent.version !== CONSENT_VERSION ||
+      !Number.isFinite(consentTime) ||
+      consentTime > now + CONSENT_FUTURE_SKEW_MS ||
+      consentTime < now - CONSENT_MAX_AGE_MS
+    )
+      apiError(400, "consent_invalid");
+    consentAt = new Date(consentTime).toISOString();
+    consentVersion = CONSENT_VERSION;
+  }
+
+  return {
+    type,
+    classifiedType,
+    data: {
+      name: boundedText(data.name, 200, "name"),
+      email,
+      phone: boundedText(data.phone, 80, "phone"),
+      city: boundedText(data.city, 200, "city"),
+      story: boundedText(data.story, 10000, "story"),
+      maker: boundedText(data.maker, 1000, "maker"),
+    },
+    photoMeta: raw.photoMeta,
+    consentAt,
+    consentVersion,
+  };
+}
+
+function normalizeContinuationMeta(raw, lead) {
+  const classifiedType = boundedText(
+    raw.classifiedType ?? lead.classified_type,
+    40,
+    "classified_type",
+  );
+  if (classifiedType && !ALLOWED_INSTRUMENT_TYPES.has(classifiedType))
+    apiError(400, "classified_type_invalid");
+  const data = raw.data && typeof raw.data === "object" ? raw.data : {};
+  return {
+    type: lead.type || "other",
+    classifiedType,
+    data: {
+      story: boundedText(data.story ?? lead.story, 10000, "story"),
+      maker: boundedText(data.maker ?? lead.maker, 1000, "maker"),
+    },
+    photoMeta: raw.photoMeta,
+  };
+}
+
+function redactContactDetails(value) {
+  return String(value || "")
+    .replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/gu, "[E-Mail entfernt]")
+    .replace(/(?:\+?\d[\d\s()./-]{7,}\d)/gu, "[Telefonnummer entfernt]");
+}
+
+function aiSafeMeta(meta) {
+  const previous = meta.previousAnalysis || {};
+  return {
+    type: effectiveType(meta),
+    classifiedType: meta.classifiedType || "",
+    data: {
+      story: redactContactDetails(meta.data?.story).slice(0, 10000),
+      maker: redactContactDetails(meta.data?.maker).slice(0, 1000),
+    },
+    previousAnalysis: meta.previousAnalysis
+      ? {
+          lead_class: ["A", "B", "C"].includes(previous.lead_class)
+            ? previous.lead_class
+            : undefined,
+          notable: Boolean(previous.notable),
+          title: redactContactDetails(previous.title).slice(0, 300),
+          summary: redactContactDetails(previous.summary).slice(0, 2000),
+          signals: Array.isArray(previous.signals)
+            ? previous.signals
+                .slice(0, 12)
+                .map((value) => redactContactDetails(value).slice(0, 300))
+            : [],
+        }
+      : undefined,
+  };
+}
+
+function sortedFiles(formData, prefix) {
+  const entries = [...formData.entries()].filter(
+    ([key, value]) => key.startsWith(prefix) && value instanceof File,
+  );
+  const seen = new Set();
+  for (const [key] of entries) {
+    const suffix = key.slice(prefix.length);
+    if (!/^\d{1,2}$/u.test(suffix) || seen.has(suffix))
+      apiError(400, "photo_field_invalid");
+    seen.add(suffix);
+  }
+  return entries.sort(
+    (a, b) => Number(a[0].slice(prefix.length)) - Number(b[0].slice(prefix.length)),
+  );
+}
+
+async function continuationOperationHash(request, leadId, meta, files) {
+  const clientKey = (request.headers.get("Idempotency-Key") || "").trim();
+  if (clientKey && !/^[A-Za-z0-9._:-]{16,128}$/u.test(clientKey))
+    apiError(400, "idempotency_key_invalid");
+  if (clientKey)
+    return {
+      hash: await sha256(`lead-continuation\n${leadId}\n${clientKey}`),
+      legacy: false,
+    };
+
+  // Cached clients from before the Idempotency-Key rollout remain safe: their
+  // operation key is derived from the normalized mutation and original bytes.
+  const fileFingerprints = [];
+  for (const [field, file] of files)
+    fileFingerprints.push({
+      field,
+      name: file.name || "",
+      type: file.type,
+      size: file.size,
+      digest: await sha256Bytes(await file.arrayBuffer()),
+    });
+  return {
+    hash: await sha256(
+      `lead-continuation-legacy\n${leadId}\n${JSON.stringify({
+        classifiedType: meta.classifiedType,
+        data: meta.data,
+        photoMeta: meta.photoMeta || [],
+        files: fileFingerprints,
+      })}`,
+    ),
+    legacy: true,
+  };
+}
+
+async function legacyInitialOperationHash(request, meta, files) {
+  const fingerprints = [];
+  for (const [field, file] of files) {
+    fingerprints.push({
+      field,
+      name: file.name || "",
+      type: file.type,
+      size: file.size,
+      digest: await sha256Bytes(await file.arrayBuffer()),
+    });
+  }
+  return sha256(
+    `lead-create-legacy\n${request.headers.get("Origin") || ""}\n${JSON.stringify({
+      type: meta.type,
+      classifiedType: meta.classifiedType,
+      data: meta.data,
+      photoMeta: meta.photoMeta || [],
+      files: fingerprints,
+    })}`,
+  );
+}
+
+async function validatePhotoBundle(
+  files,
+  thumbnailFiles,
+  aiFiles,
+  currentPhotoCount = 0,
+) {
+  if (
+    files.length > MAX_PHOTOS_PER_REQUEST ||
+    currentPhotoCount + files.length > MAX_PHOTOS_PER_LEAD
+  )
+    apiError(400, "too_many_photos");
+  if (thumbnailFiles.length > files.length || aiFiles.length > files.length)
+    apiError(400, "photo_variants_invalid");
+  const originalIndexes = new Set(
+    files.map(([key]) => key.slice("photo_".length)),
+  );
+  if (
+    [...thumbnailFiles, ...aiFiles].some(([key]) => {
+      const prefix = key.startsWith("thumb_") ? "thumb_" : "ai_";
+      return !originalIndexes.has(key.slice(prefix.length));
+    })
+  )
+    apiError(400, "photo_variants_invalid");
+
+  let originalBytes = 0;
+  let thumbnailBytes = 0;
+  let aiBytes = 0;
+  for (const [, file] of files) {
+    await validateImageFile(file, MAX_ORIGINAL_BYTES, "invalid_photo");
+    originalBytes += file.size;
+  }
+  for (const [, file] of thumbnailFiles) {
+    await validateImageFile(file, MAX_THUMBNAIL_BYTES, "invalid_thumbnail");
+    thumbnailBytes += file.size;
+  }
+  for (const [, file] of aiFiles) {
+    await validateImageFile(file, MAX_AI_IMAGE_BYTES, "invalid_ai_image");
+    aiBytes += file.size;
+  }
+  if (originalBytes > 32 * 1024 * 1024) apiError(413, "photos_too_large");
+  if (thumbnailBytes > 5 * 1024 * 1024)
+    apiError(413, "thumbnails_too_large");
+  if (aiBytes > 8 * 1024 * 1024) apiError(413, "ai_images_too_large");
+}
+
+function photoDescriptors(
+  leadId,
+  files,
+  thumbnailFiles,
+  photoMeta,
+  created,
+  { deterministic = false, operationKeyHash = null } = {},
+) {
+  const thumbnailsByIndex = new Map(
+    thumbnailFiles.map(([key, file]) => [key.slice("thumb_".length), file]),
+  );
+  return files.map(([fieldName, file], index) => {
+    const pid = operationKeyHash
+      ? `${leadId}-C${operationKeyHash.slice(0, 20)}-P${index + 1}`
+      : deterministic
+        ? `${leadId}-P${index + 1}`
+        : id("P");
+    const safeName = (file.name || "photo.jpg")
+      .replace(/[^a-zA-Z0-9._-]/g, "_")
+      .slice(0, 120);
+    const objectKey = `${leadId}/${pid}-${safeName || "photo.jpg"}`;
+    const thumbnail = thumbnailsByIndex.get(
+      fieldName.slice("photo_".length),
+    );
+    const thumbnailKey = thumbnail
+      ? `${leadId}/${pid}-thumb.${
+          thumbnail.type === "image/png"
+            ? "png"
+            : thumbnail.type === "image/webp"
+              ? "webp"
+              : "jpg"
+        }`
+      : null;
+    return {
+      pid,
+      file,
+      thumbnail,
+      objectKey,
+      thumbnailKey,
+      kind: photoMeta[index]?.kind || "",
+      label: photoMeta[index]?.label || "",
+      created,
+      operationKeyHash,
+    };
+  });
+}
+
+async function reservePhotoRows(env, leadId, descriptors) {
+  if (!descriptors.length) return;
+  const ids = descriptors.map((descriptor) => descriptor.pid);
+  const placeholders = ids.map(() => "?").join(",");
+  const operationKeyHash = descriptors[0].operationKeyHash;
+  const operationRow = operationKeyHash
+    ? await env.LEADS.prepare(
+        `SELECT COUNT(*) AS count FROM photos
+         WHERE lead_id=? AND operation_key_hash=?`,
+      )
+        .bind(leadId, operationKeyHash)
+        .first()
+    : await env.LEADS.prepare(
+        `SELECT COUNT(*) AS count FROM photos
+         WHERE lead_id=? AND operation_key_hash IS NULL`,
+      )
+        .bind(leadId)
+        .first();
+  const operationCount = Number(operationRow?.count || 0);
+  if (operationCount && operationCount !== descriptors.length)
+    apiError(409, "idempotency_payload_conflict");
+  const { results: existing = [] } = await env.LEADS.prepare(
+    `SELECT id FROM photos WHERE lead_id=? AND id IN (${placeholders})`,
+  )
+    .bind(leadId, ...ids)
+    .all();
+  if (existing.length && existing.length !== descriptors.length)
+    apiError(409, "idempotency_payload_conflict");
+  if (existing.length === descriptors.length) return;
+
+  const first = descriptors[0];
+  const statements = [
+    env.LEADS.prepare(
+      `INSERT INTO photos
+        (id,lead_id,object_key,thumbnail_key,kind,label,content_type,created_at,
+         storage_status,storage_error,operation_key_hash)
+       SELECT ?,?,?,?,?,?,?,?,'pending','',?
+       FROM leads l
+       WHERE l.id=? AND l.deleted_at IS NULL
+         AND (SELECT COUNT(*) FROM photos WHERE lead_id=?) + ? <= ?
+       ON CONFLICT(id) DO NOTHING`,
+    ).bind(
+      first.pid,
+      leadId,
+      first.objectKey,
+      first.thumbnailKey,
+      first.kind,
+      first.label,
+      first.file.type,
+      first.created,
+      first.operationKeyHash,
+      leadId,
+      leadId,
+      descriptors.length,
+      MAX_PHOTOS_PER_LEAD,
+    ),
+  ];
+  for (const descriptor of descriptors.slice(1)) {
+    statements.push(
+      env.LEADS.prepare(
+        `INSERT INTO photos
+          (id,lead_id,object_key,thumbnail_key,kind,label,content_type,created_at,
+           storage_status,storage_error,operation_key_hash)
+         SELECT ?,?,?,?,?,?,?,?,'pending','',?
+         FROM leads l
+         WHERE l.id=? AND l.deleted_at IS NULL
+           AND EXISTS (
+             SELECT 1 FROM photos p
+             WHERE p.id=? AND p.lead_id=? AND p.created_at=?
+           )
+         ON CONFLICT(id) DO NOTHING`,
+      ).bind(
+        descriptor.pid,
+        leadId,
+        descriptor.objectKey,
+        descriptor.thumbnailKey,
+        descriptor.kind,
+        descriptor.label,
+        descriptor.file.type,
+        descriptor.created,
+        descriptor.operationKeyHash,
+        leadId,
+        first.pid,
+        leadId,
+        first.created,
+      ),
+    );
+  }
+  await env.LEADS.batch(statements);
+  const row = await env.LEADS.prepare(
+    `SELECT
+       (SELECT COUNT(*) FROM photos WHERE lead_id=? AND id IN (${placeholders})) AS reserved,
+       (SELECT COUNT(*) FROM leads WHERE id=? AND deleted_at IS NULL) AS active`,
+  )
+    .bind(leadId, ...ids, leadId)
+    .first();
+  if (!Number(row?.active || 0)) apiError(410, "lead_deleted");
+  if (Number(row?.reserved || 0) !== descriptors.length)
+    apiError(400, "too_many_photos");
+}
+
+async function activeLeadExists(env, leadId) {
+  const row = await env.LEADS.prepare(
+    `SELECT COUNT(*) AS count FROM leads WHERE id=? AND deleted_at IS NULL`,
+  )
+    .bind(leadId)
+    .first();
+  return Number(row?.count || 0) > 0;
+}
+
+async function persistPhotos(
   env,
   leadId,
   files,
   thumbnailFiles,
   photoMeta,
   created,
+  { deterministic = false, operationKeyHash = null } = {},
 ) {
+  const descriptors = photoDescriptors(
+    leadId,
+    files,
+    thumbnailFiles,
+    photoMeta,
+    created,
+    { deterministic, operationKeyHash },
+  );
+  await reservePhotoRows(env, leadId, descriptors);
   const stored = [];
-  for (let i = 0; i < files.length; i++) {
-    const [, file] = files[i];
-    if (!file.type.startsWith("image/") || file.size > 20 * 1024 * 1024)
-      throw new Error("invalid_photo");
-    const pid = id("P");
-    const safeName = (file.name || "photo.jpg").replace(
-      /[^a-zA-Z0-9._-]/g,
-      "_",
-    );
-    const key = `${leadId}/${pid}-${safeName}`;
-    const thumbnail = thumbnailFiles[i]?.[1];
-    let thumbnailKey = null;
-    const writes = [
-      env.PHOTOS.put(key, file.stream(), {
-        httpMetadata: { contentType: file.type || "application/octet-stream" },
-      }),
-    ];
-    if (thumbnail) {
-      if (
-        !thumbnail.type.startsWith("image/") ||
-        thumbnail.size > 2 * 1024 * 1024
-      )
-        throw new Error("invalid_thumbnail");
-      thumbnailKey = `${leadId}/${pid}-thumb.jpg`;
-      writes.push(
-        env.PHOTOS.put(thumbnailKey, thumbnail.stream(), {
-          httpMetadata: { contentType: thumbnail.type || "image/jpeg" },
-        }),
-      );
+  for (const descriptor of descriptors) {
+    const { pid, file, thumbnail } = descriptor;
+    const row = await env.LEADS.prepare(
+      `SELECT object_key,thumbnail_key,storage_status FROM photos WHERE id=? AND lead_id=?`,
+    )
+      .bind(pid, leadId)
+      .first();
+    if (!row) throw new Error("photo_journal_missing");
+    if (row.storage_status === "ready") {
+      stored.push({ id: pid, ready: true });
+      continue;
     }
-    await Promise.all(writes);
-    stored.push({
-      id: pid,
-      key,
-      thumbnailKey,
-      kind: photoMeta[i]?.kind || "",
-      label: photoMeta[i]?.label || "",
-      type: file.type || "image/jpeg",
-    });
+    try {
+      await env.PHOTOS.put(row.object_key, file.stream(), {
+        httpMetadata: { contentType: file.type },
+      });
+      if (thumbnail && row.thumbnail_key)
+        await env.PHOTOS.put(row.thumbnail_key, thumbnail.stream(), {
+          httpMetadata: { contentType: thumbnail.type },
+        });
+      const marked = await env.LEADS.prepare(
+        `UPDATE photos SET storage_status='ready',storage_error=''
+         WHERE id=? AND lead_id=? AND EXISTS (
+           SELECT 1 FROM leads WHERE id=? AND deleted_at IS NULL
+         )`,
+      )
+        .bind(pid, leadId, leadId)
+        .run();
+      if (!Number(marked.meta?.changes || 0)) {
+        await env.LEADS.prepare(
+          `UPDATE photos SET storage_status='failed',storage_error='lead_deleted'
+           WHERE id=? AND lead_id=?`,
+        )
+          .bind(pid, leadId)
+          .run();
+        await queueObjectDeletions(env, leadId, [
+          row.object_key,
+          row.thumbnail_key,
+        ]);
+        await processDeletionQueue(env, [leadId], 10);
+        stored.push({ id: pid, ready: false, deleted: true });
+        continue;
+      }
+      stored.push({ id: pid, ready: true });
+    } catch (error) {
+      console.error("Photo storage failed", leadId, pid, error);
+      try {
+        await env.LEADS.prepare(
+          `UPDATE photos SET storage_status='failed',storage_error=? WHERE id=?`,
+        )
+          .bind(String(error).slice(0, 1000), pid)
+          .run();
+      } catch (journalError) {
+        console.error("Photo journal update failed", leadId, pid, journalError);
+      }
+      const deleted = !(await activeLeadExists(env, leadId));
+      if (deleted) {
+        await queueObjectDeletions(env, leadId, [
+          row.object_key,
+          row.thumbnail_key,
+        ]);
+        await processDeletionQueue(env, [leadId], 10);
+      }
+      stored.push({ id: pid, ready: false, deleted });
+    }
   }
   return stored;
 }
 
-async function insertPhotoRows(env, leadId, photos, created) {
-  for (const photo of photos)
-    await env.LEADS.prepare(
-      `INSERT INTO photos (id,lead_id,object_key,thumbnail_key,kind,label,content_type,created_at) VALUES (?,?,?,?,?,?,?,?)`,
-    )
-      .bind(
-        photo.id,
-        leadId,
-        photo.key,
-        photo.thumbnailKey,
-        photo.kind,
-        photo.label,
-        photo.type,
-        created,
-      )
-      .run();
+async function readyPhotoCount(env, leadId) {
+  const row = await env.LEADS.prepare(
+    `SELECT COUNT(*) AS count FROM photos
+     WHERE lead_id=? AND storage_status IN ('ready','thumbnail_pending')`,
+  )
+    .bind(leadId)
+    .first();
+  return Number(row?.count || 0);
 }
 
 function extractText(response) {
@@ -246,6 +876,50 @@ function reviewUrl(env, leadId) {
   return `${base}/review/?lead=${encodeURIComponent(leadId)}`;
 }
 
+function fallbackAnalysis(meta, reason = "unavailable") {
+  const type = effectiveType(meta);
+  const priority = type === "double_bass" || type === "bow";
+  return {
+    lead_class: priority ? "A" : type === "guitar" || type === "other" ? "C" : "B",
+    interest_score: priority ? 85 : type === "guitar" || type === "other" ? 10 : 45,
+    confidence: 45,
+    notable: ["estate", "unknown", "bow"].includes(type),
+    summary: "Konservative Regelklassifizierung; persönliche Prüfung erforderlich.",
+    title: type === "guitar" ? "Gitarre" : type || "Instrument",
+    signals: [],
+    analysis_source: "fallback",
+    analysis_reason: reason,
+  };
+}
+
+function normalizedAnalysis(value, meta, source = "openai") {
+  const fallback = fallbackAnalysis(meta);
+  const leadClass = ["A", "B", "C"].includes(value?.lead_class)
+    ? value.lead_class
+    : fallback.lead_class;
+  const score = Number(value?.interest_score);
+  const confidence = Number(value?.confidence);
+  const signals = Array.isArray(value?.signals)
+    ? value.signals
+        .slice(0, 12)
+        .map((signal) => boundedText(signal, 300, "ai_signal"))
+    : [];
+  return {
+    lead_class: leadClass,
+    interest_score: Number.isFinite(score)
+      ? Math.max(0, Math.min(100, Math.round(score)))
+      : fallback.interest_score,
+    confidence: Number.isFinite(confidence)
+      ? Math.max(0, Math.min(100, Math.round(confidence)))
+      : fallback.confidence,
+    notable: Boolean(value?.notable),
+    title: boundedText(value?.title || fallback.title, 300, "ai_title"),
+    summary: boundedText(value?.summary || fallback.summary, 2000, "ai_summary"),
+    signals,
+    analysis_source: source,
+  };
+}
+
 async function openai(env, body) {
   const r = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
@@ -255,7 +929,8 @@ async function openai(env, body) {
     },
     body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(`OpenAI ${r.status}: ${await r.text()}`);
+  if (!r.ok)
+    throw new Error(`OpenAI ${r.status}: ${(await r.text()).slice(0, 500)}`);
   return r.json();
 }
 async function blobDataUrl(blob) {
@@ -267,6 +942,18 @@ async function blobDataUrl(blob) {
 }
 
 async function photoCheck(request, env) {
+  requirePublicWriteOrigin(request, env);
+  await enforceRateLimit(request, env, "photo-check", 20, 10 * 60);
+  assertContentLength(request, MAX_PHOTO_CHECK_REQUEST_BYTES);
+  const fd = await readMultipart(request, MAX_PHOTO_CHECK_REQUEST_BYTES);
+  const image = fd.get("image");
+  const expected = boundedText(fd.get("expected") || "Foto", 120, "expected");
+  const instruction = boundedText(fd.get("instruction"), 500, "instruction");
+  const mode = boundedText(fd.get("mode") || "quality", 20, "mode");
+  if (!["quality", "identify"].includes(mode)) apiError(400, "mode_invalid");
+  if (!(image instanceof File))
+    return json({ error: "image missing" }, 400, request, env);
+  await validateImageFile(image, MAX_PHOTO_CHECK_BYTES, "invalid_image");
   if (!env.OPENAI_API_KEY)
     return json(
       { ok: true, message: "Foto ist brauchbar." },
@@ -274,13 +961,6 @@ async function photoCheck(request, env) {
       request,
       env,
     );
-  const fd = await request.formData();
-  const image = fd.get("image");
-  const expected = fd.get("expected") || "Foto";
-  const instruction = fd.get("instruction") || "";
-  const mode = fd.get("mode") || "quality";
-  if (!(image instanceof File))
-    return json({ error: "image missing" }, 400, request, env);
   const dataUrl = await blobDataUrl(image);
   const schema =
     mode === "identify"
@@ -314,8 +994,8 @@ async function photoCheck(request, env) {
         };
   const prompt =
     mode === "identify"
-      ? `${PHOTO_PROMPT}\nZusätzlich ordne den Gegenstand grob ein. Wenn unsicher, detected_type=uncertain. Aufgabe: ${expected}. ${instruction}`
-      : `${PHOTO_PROMPT}\nErwartetes Motiv: ${expected}. Anweisung: ${instruction}`;
+      ? `${PHOTO_PROMPT}\nZusätzlich ordne den Gegenstand grob ein. Wenn unsicher, detected_type=uncertain. Aufgabe: ${redactContactDetails(expected)}. ${redactContactDetails(instruction)}`
+      : `${PHOTO_PROMPT}\nErwartetes Motiv: ${redactContactDetails(expected)}. Anweisung: ${redactContactDetails(instruction)}`;
   const response = await openai(env, {
     model: env.OPENAI_MODEL || "gpt-5.6-luna",
     input: [
@@ -336,7 +1016,30 @@ async function photoCheck(request, env) {
       },
     },
   });
-  return json(JSON.parse(extractText(response)), 200, request, env);
+  const result = JSON.parse(extractText(response));
+  return json(
+    {
+      ok: Boolean(result.ok),
+      message: boundedText(result.message, 500, "photo_check_message"),
+      ...(mode === "identify" && {
+        detected_type: [
+          "double_bass",
+          "bow",
+          "violin",
+          "viola",
+          "cello",
+          "guitar",
+          "other",
+          "uncertain",
+        ].includes(result.detected_type)
+          ? result.detected_type
+          : "uncertain",
+      }),
+    },
+    200,
+    request,
+    env,
+  );
 }
 
 async function analyzeLead(env, meta, smallImages = []) {
@@ -351,17 +1054,9 @@ async function analyzeLead(env, meta, smallImages = []) {
         "Normale Anfrage zur wöchentlichen Durchsicht; keine KI-Analyse ausgeführt.",
       title: type === "guitar" ? "Gitarre" : "Sonstiges Instrument",
       signals: [],
+      analysis_source: "rule",
     };
-  if (!env.OPENAI_API_KEY)
-    return {
-      lead_class: type === "double_bass" || type === "bow" ? "A" : "B",
-      interest_score: type === "double_bass" || type === "bow" ? 90 : 45,
-      confidence: 55,
-      notable: ["estate", "unknown", "bow"].includes(type),
-      summary: "KI nicht konfiguriert – konservative Regelklassifizierung.",
-      title: type || "Instrument",
-      signals: [],
-    };
+  if (!env.OPENAI_API_KEY) return fallbackAnalysis(meta, "not_configured");
   const schema = {
     type: "object",
     properties: {
@@ -387,7 +1082,7 @@ async function analyzeLead(env, meta, smallImages = []) {
   const content = [
     {
       type: "input_text",
-      text: `${LEAD_PROMPT}\nAnfrage: ${JSON.stringify(meta)}`,
+      text: `${LEAD_PROMPT}\nAnfrage: ${JSON.stringify(aiSafeMeta(meta))}`,
     },
   ];
   for (const image of smallImages.slice(0, 8))
@@ -404,7 +1099,7 @@ async function analyzeLead(env, meta, smallImages = []) {
       },
     },
   });
-  return JSON.parse(extractText(response));
+  return normalizedAnalysis(JSON.parse(extractText(response)), meta);
 }
 
 function makePayload(env, leadId, created, meta, ai, photoCount) {
@@ -414,7 +1109,7 @@ function makePayload(env, leadId, created, meta, ai, photoCount) {
     created_at: created,
     instrument_type: meta.type || "",
     classified_type: meta.classifiedType || "",
-    ai_used: aiEligible(meta),
+    ai_used: ai.analysis_source === "openai",
     title: ai.title || effectiveType(meta),
     lead_class: ai.lead_class,
     notable: Boolean(ai.notable),
@@ -470,114 +1165,416 @@ async function notifyMake(env, payload) {
 }
 
 async function createLead(request, env, ctx) {
-  const fd = await request.formData();
-  const meta = JSON.parse(fd.get("meta") || "{}");
-  const leadId = id();
+  requirePublicWriteOrigin(request, env);
+  await enforceRateLimit(request, env, "lead-create", 5, 60 * 60);
+  const clientKey = (request.headers.get("Idempotency-Key") || "").trim();
+  if (clientKey && !/^[A-Za-z0-9._:-]{16,128}$/u.test(clientKey))
+    apiError(400, "idempotency_key_invalid");
+  const fd = await readMultipart(request, MAX_LEAD_REQUEST_BYTES);
   const created = new Date().toISOString();
-  const photoMeta = meta.photoMeta || [];
-  const small = [];
+  const rawMeta = parseJsonField(fd);
+  const allowLegacy =
+    !clientKey && rawMeta.consent === undefined && legacySubmissionAllowed(env);
+  if (!clientKey && !allowLegacy)
+    apiError(400, "idempotency_key_missing");
+  const meta = normalizeInitialMeta(rawMeta, created, { allowLegacy });
   const files = sortedFiles(fd, "photo_");
   const thumbnailFiles = sortedFiles(fd, "thumb_");
   const aiFiles = sortedFiles(fd, "ai_");
-  for (const [, file] of aiFiles.slice(0, 8))
-    small.push(await blobDataUrl(file));
-  const stored = await storePhotos(
-    env,
-    leadId,
-    files,
-    thumbnailFiles,
-    photoMeta,
-    created,
-  );
-  const ai = await analyzeLead(env, meta, small);
-  await env.LEADS.prepare(
-    `INSERT INTO leads (id,created_at,type,classified_type,name,email,phone,city,story,maker,lead_class,interest_score,confidence,notable,summary,ai_json,photo_count,make_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+  await validatePhotoBundle(files, thumbnailFiles, aiFiles);
+  const photoMeta = normalizePhotoMeta(meta.photoMeta, files.length);
+  const idempotencyHash = clientKey
+    ? await sha256(clientKey)
+    : await legacyInitialOperationHash(
+        request,
+        { ...meta, photoMeta },
+        files,
+      );
+
+  let existing = await env.LEADS.prepare(
+    `SELECT * FROM leads WHERE idempotency_key_hash=?`,
   )
-    .bind(
-      leadId,
-      created,
-      meta.type || "",
-      meta.classifiedType || "",
-      meta.data?.name || "",
-      meta.data?.email || "",
-      meta.data?.phone || "",
-      meta.data?.city || "",
-      meta.data?.story || "",
-      meta.data?.maker || "",
-      ai.lead_class,
-      ai.interest_score,
-      ai.confidence,
-      ai.notable ? 1 : 0,
-      ai.summary,
-      JSON.stringify(ai),
-      stored.length,
-      env.MAKE_WEBHOOK_URL ? "pending" : "disabled",
+    .bind(idempotencyHash)
+    .first();
+  const responseFor = async (lead, status, idempotent) => {
+    const continuationToken = await createContinuationToken(env, lead.id);
+    return json(
+      {
+        ...(status === 409 && {
+          error: "operation_pending",
+          retryable: true,
+        }),
+        id: lead.id,
+        class: lead.lead_class || "C",
+        notable: Boolean(lead.notable),
+        review_url: reviewUrl(env, lead.id),
+        continuation_token: continuationToken,
+        continuation_available: Boolean(continuationToken),
+        processing_status: lead.processing_status || "ready",
+        idempotent,
+      },
+      status,
+      request,
+      env,
+      status === 409 ? { "Retry-After": "2" } : {},
+    );
+  };
+  if (existing) {
+    const updatedAt = Date.parse(
+      existing.processing_updated_at || existing.created_at || "",
+    );
+    const stalePending =
+      existing.processing_status === "pending" &&
+      (!Number.isFinite(updatedAt) || Date.now() - updatedAt > 2 * 60 * 1000);
+    const retryable =
+      ["failed", "partial"].includes(existing.processing_status) ||
+      stalePending;
+    if (!retryable)
+      return responseFor(
+        existing,
+        existing.processing_status === "pending" ? 409 : 200,
+        true,
+      );
+    const staleCutoff = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+    const claimed = await env.LEADS.prepare(
+      `UPDATE leads
+       SET processing_status='pending',processing_error='',processing_updated_at=?
+       WHERE id=? AND deleted_at IS NULL AND (
+         processing_status IN ('failed','partial') OR
+         (processing_status='pending' AND
+          COALESCE(processing_updated_at,created_at)<=?)
+       )`,
     )
-    .run();
-  await insertPhotoRows(env, leadId, stored, created);
-  const payload = makePayload(env, leadId, created, meta, ai, stored.length);
-  if (ctx?.waitUntil) ctx.waitUntil(notifyMake(env, payload));
-  else await notifyMake(env, payload);
-  const continuationToken = await createContinuationToken(env, leadId);
-  return json(
-    {
-      id: leadId,
-      class: ai.lead_class,
-      notable: ai.notable,
-      review_url: payload.review_url,
-      continuation_token: continuationToken,
-    },
-    201,
-    request,
-    env,
-  );
+      .bind(created, existing.id, staleCutoff)
+      .run();
+    if (!Number(claimed.meta?.changes || 0)) {
+      const current = await env.LEADS.prepare(`SELECT * FROM leads WHERE id=?`)
+        .bind(existing.id)
+        .first();
+      if (!current || current.deleted_at) apiError(410, "lead_deleted");
+      return responseFor(
+        current,
+        current.processing_status === "pending" ? 409 : 200,
+        true,
+      );
+    }
+  }
+
+  const leadId = existing?.id || id();
+  const fallback = fallbackAnalysis(meta, "pending");
+  if (!existing) try {
+    await env.LEADS.prepare(
+      `INSERT INTO leads (
+        id,created_at,type,classified_type,name,email,phone,city,story,maker,
+        lead_class,interest_score,confidence,notable,summary,ai_json,photo_count,
+        make_status,idempotency_key_hash,processing_status,processing_error,
+        processing_updated_at,consent_at,consent_version
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    )
+      .bind(
+        leadId,
+        created,
+        meta.type,
+        meta.classifiedType,
+        meta.data.name,
+        meta.data.email,
+        meta.data.phone,
+        meta.data.city,
+        meta.data.story,
+        meta.data.maker,
+        fallback.lead_class,
+        fallback.interest_score,
+        fallback.confidence,
+        fallback.notable ? 1 : 0,
+        fallback.summary,
+        JSON.stringify(fallback),
+        0,
+        env.MAKE_WEBHOOK_URL ? "pending" : "disabled",
+        idempotencyHash,
+        "pending",
+        "",
+        created,
+        meta.consentAt,
+        meta.consentVersion,
+      )
+      .run();
+  } catch (error) {
+    existing = await env.LEADS.prepare(
+      `SELECT * FROM leads WHERE idempotency_key_hash=?`,
+    )
+      .bind(idempotencyHash)
+      .first();
+    if (existing)
+      return responseFor(
+        existing,
+        existing.processing_status === "pending" ? 409 : 200,
+        true,
+      );
+    throw error;
+  }
+
+  try {
+    const stored = await persistPhotos(
+      env,
+      leadId,
+      files,
+      thumbnailFiles,
+      photoMeta,
+      created,
+      { deterministic: true },
+    );
+    const small = [];
+    for (const [, file] of aiFiles.slice(0, MAX_PHOTOS_PER_REQUEST))
+      small.push(await blobDataUrl(file));
+
+    let ai;
+    let analysisError = "";
+    try {
+      ai = await analyzeLead(env, meta, small);
+    } catch (error) {
+      console.error("Lead analysis failed", leadId, error);
+      analysisError = `ai_failed: ${String(error).slice(0, 900)}`;
+      ai = fallbackAnalysis(meta, "analysis_failed");
+    }
+    const photoCount = await readyPhotoCount(env, leadId);
+    const photoFailure = stored.some((photo) => !photo.ready);
+    const processingStatus = photoFailure ? "partial" : "ready";
+    const processingError = [
+      photoFailure ? "one_or_more_photos_failed" : "",
+      analysisError,
+    ]
+      .filter(Boolean)
+      .join("; ")
+      .slice(0, 1000);
+    const updated = await env.LEADS.prepare(
+      `UPDATE leads SET
+        lead_class=?,interest_score=?,confidence=?,notable=?,summary=?,ai_json=?,
+        photo_count=?,processing_status=?,processing_error=?,processing_updated_at=?
+       WHERE id=? AND deleted_at IS NULL`,
+    )
+      .bind(
+        ai.lead_class,
+        ai.interest_score,
+        ai.confidence,
+        ai.notable ? 1 : 0,
+        ai.summary,
+        JSON.stringify(ai),
+        photoCount,
+        processingStatus,
+        processingError,
+        new Date().toISOString(),
+        leadId,
+      )
+      .run();
+    if (!Number(updated.meta?.changes || 0)) apiError(410, "lead_deleted");
+    if (photoFailure)
+      return json(
+        {
+          error: "photo_storage_failed",
+          id: leadId,
+          retryable: true,
+          processing_status: "partial",
+        },
+        503,
+        request,
+        env,
+        { "Retry-After": "2" },
+      );
+    const payload = makePayload(env, leadId, created, meta, ai, photoCount);
+    if (ctx?.waitUntil) ctx.waitUntil(notifyMake(env, payload));
+    else await notifyMake(env, payload);
+    return responseFor(
+      {
+        id: leadId,
+        lead_class: ai.lead_class,
+        notable: ai.notable,
+        processing_status: processingStatus,
+      },
+      existing ? 200 : 201,
+      Boolean(existing),
+    );
+  } catch (error) {
+    console.error("Lead processing failed", leadId, error);
+    try {
+      await env.LEADS.prepare(
+        `UPDATE leads SET processing_status='failed',processing_error=?,processing_updated_at=? WHERE id=?`,
+      )
+        .bind(
+          String(error).slice(0, 1000),
+          new Date().toISOString(),
+          leadId,
+        )
+        .run();
+    } catch (journalError) {
+      console.error("Lead processing journal failed", leadId, journalError);
+    }
+    throw error;
+  }
 }
 
 async function continueLead(request, leadId, env) {
+  requirePublicWriteOrigin(request, env);
+  await enforceRateLimit(request, env, "lead-continue", 30, 60 * 60);
+  leadId = boundedText(leadId, 128, "lead_id", { required: true });
   const auth = request.headers.get("Authorization") || "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
   if (!(await validContinuationToken(env, leadId, token)))
     return json({ error: "unauthorized" }, 401, request, env);
 
-  const lead = await env.LEADS.prepare(`SELECT * FROM leads WHERE id=?`)
+  const lead = await env.LEADS.prepare(
+    `SELECT * FROM leads WHERE id=? AND deleted_at IS NULL`,
+  )
     .bind(leadId)
     .first();
   if (!lead) return json({ error: "not_found" }, 404, request, env);
 
-  const fd = await request.formData();
-  const meta = JSON.parse(fd.get("meta") || "{}");
-  const photoMeta = Array.isArray(meta.photoMeta) ? meta.photoMeta : [];
+  const fd = await readMultipart(request, MAX_LEAD_REQUEST_BYTES);
+  const meta = normalizeContinuationMeta(parseJsonField(fd), lead);
   const files = sortedFiles(fd, "photo_");
   const thumbnailFiles = sortedFiles(fd, "thumb_");
   const aiFiles = sortedFiles(fd, "ai_");
-  const currentPhotoCount = Number(lead.photo_count || 0);
-  if (files.length > 8 || currentPhotoCount + files.length > 12)
-    return json({ error: "too_many_photos" }, 400, request, env);
-
-  const allowedTypes = new Set([
-    "double_bass",
-    "bow",
-    "strings",
-    "guitar",
-    "estate",
-    "unknown",
-    "other",
-  ]);
-  const classifiedType = allowedTypes.has(meta.classifiedType)
-    ? meta.classifiedType
-    : lead.classified_type || "";
-  const story = String(meta.data?.story ?? lead.story ?? "").slice(0, 10000);
-  const maker = String(meta.data?.maker ?? lead.maker ?? "").slice(0, 1000);
-  const created = new Date().toISOString();
-  const stored = await storePhotos(
-    env,
+  await validatePhotoBundle(files, thumbnailFiles, aiFiles);
+  const photoMeta = normalizePhotoMeta(meta.photoMeta, files.length);
+  const operation = await continuationOperationHash(
+    request,
     leadId,
+    { ...meta, photoMeta },
     files,
-    thumbnailFiles,
-    photoMeta,
-    created,
   );
-  await insertPhotoRows(env, leadId, stored, created);
+  const operationResponse = (payload, status = 200, idempotent = false) =>
+    json(
+      {
+        ...payload,
+        idempotent,
+        legacy_idempotency: operation.legacy,
+      },
+      status,
+      request,
+      env,
+      status === 409 ? { "Retry-After": "2" } : {},
+    );
+  let journal = await env.LEADS.prepare(
+    `SELECT * FROM lead_continuations
+     WHERE lead_id=? AND idempotency_key_hash=?`,
+  )
+    .bind(leadId, operation.hash)
+    .first();
+  if (journal?.status === "complete" && journal.response_json) {
+    try {
+      return operationResponse(JSON.parse(journal.response_json), 200, true);
+    } catch {
+      await env.LEADS.prepare(
+        `UPDATE lead_continuations SET status='failed',last_error='invalid_response_json'
+         WHERE lead_id=? AND idempotency_key_hash=? AND status='complete'`,
+      )
+        .bind(leadId, operation.hash)
+        .run();
+      journal.status = "failed";
+    }
+  }
+  if (journal?.status === "pending") {
+    const updatedAt = Date.parse(journal.updated_at || journal.created_at || "");
+    if (Number.isFinite(updatedAt) && Date.now() - updatedAt <= 2 * 60 * 1000)
+      return operationResponse(
+        {
+          ok: false,
+          error: "operation_pending",
+          retryable: true,
+          id: leadId,
+          photo_count: Number(lead.photo_count || 0),
+          processing_status: "pending",
+        },
+        409,
+        true,
+      );
+  }
+
+  const classifiedType = meta.classifiedType;
+  const story = meta.data.story;
+  const maker = meta.data.maker;
+  const created = new Date().toISOString();
+  if (journal) {
+    const staleCutoff = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+    const claimed = await env.LEADS.prepare(
+      `UPDATE lead_continuations SET
+        status='pending',updated_at=?,last_error='',response_json=NULL
+       WHERE lead_id=? AND idempotency_key_hash=? AND (
+         status='failed' OR (status='pending' AND updated_at<=?)
+       )`,
+    )
+      .bind(created, leadId, operation.hash, staleCutoff)
+      .run();
+    if (!Number(claimed.meta?.changes || 0))
+      return operationResponse(
+        {
+          ok: false,
+          error: "operation_pending",
+          retryable: true,
+          id: leadId,
+          photo_count: Number(lead.photo_count || 0),
+          processing_status: "pending",
+        },
+        409,
+        true,
+      );
+  } else {
+    const insert = await env.LEADS.prepare(
+      `INSERT INTO lead_continuations
+        (lead_id,idempotency_key_hash,created_at,updated_at,status)
+       VALUES (?,?,?,?,?)
+       ON CONFLICT(lead_id,idempotency_key_hash) DO NOTHING`,
+    )
+      .bind(leadId, operation.hash, created, created, "pending")
+      .run();
+    if (Number(insert.meta?.changes || 0) === 0) {
+      journal = await env.LEADS.prepare(
+        `SELECT * FROM lead_continuations
+         WHERE lead_id=? AND idempotency_key_hash=?`,
+      )
+        .bind(leadId, operation.hash)
+        .first();
+      if (journal?.status === "complete" && journal.response_json)
+        return operationResponse(JSON.parse(journal.response_json), 200, true);
+      return operationResponse(
+        {
+          ok: false,
+          error: "operation_pending",
+          retryable: true,
+          id: leadId,
+          photo_count: Number(lead.photo_count || 0),
+          processing_status: "pending",
+        },
+        409,
+        true,
+      );
+    }
+  }
+
+  let stored;
+  try {
+    stored = await persistPhotos(
+      env,
+      leadId,
+      files,
+      thumbnailFiles,
+      photoMeta,
+      created,
+      { operationKeyHash: operation.hash },
+    );
+  } catch (error) {
+    await env.LEADS.prepare(
+      `UPDATE lead_continuations SET status='failed',updated_at=?,last_error=?
+       WHERE lead_id=? AND idempotency_key_hash=?`,
+    )
+      .bind(
+        new Date().toISOString(),
+        String(error).slice(0, 1000),
+        leadId,
+        operation.hash,
+      )
+      .run();
+    throw error;
+  }
 
   let previousAnalysis = {};
   try {
@@ -587,10 +1584,6 @@ async function continueLead(request, leadId, env) {
     type: lead.type || "",
     classifiedType,
     data: {
-      name: lead.name || "",
-      email: lead.email || "",
-      phone: lead.phone || "",
-      city: lead.city || "",
       story,
       maker,
     },
@@ -599,8 +1592,9 @@ async function continueLead(request, leadId, env) {
   const small = [];
   for (const [, file] of aiFiles.slice(0, 8))
     small.push(await blobDataUrl(file));
-  const photoCount = currentPhotoCount + stored.length;
+  const photoCount = await readyPhotoCount(env, leadId);
   let ai = previousAnalysis;
+  let analysisError = "";
   const analysisChanged =
     small.length > 0 ||
     story !== (lead.story || "") ||
@@ -611,6 +1605,7 @@ async function continueLead(request, leadId, env) {
       ai = await analyzeLead(env, analysisMeta, small);
     } catch (error) {
       console.error("Lead continuation analysis failed", error);
+      analysisError = `ai_failed: ${String(error).slice(0, 900)}`;
     }
   }
   if (!ai || !ai.lead_class) {
@@ -622,12 +1617,71 @@ async function continueLead(request, leadId, env) {
       summary: lead.summary || "",
       title: effectiveType(analysisMeta),
       signals: [],
+      analysis_source: "fallback",
     };
   }
-  await env.LEADS.prepare(
-    `UPDATE leads SET classified_type=?,story=?,maker=?,lead_class=?,interest_score=?,confidence=?,notable=?,summary=?,ai_json=?,photo_count=? WHERE id=?`,
-  )
-    .bind(
+  const photoFailure = stored.some((photo) => !photo.ready);
+  const leadDeleted = stored.some((photo) => photo.deleted);
+  const processingStatus = photoFailure ? "partial" : "ready";
+  const processingError = [
+    photoFailure ? "one_or_more_photos_failed" : "",
+    analysisError,
+  ]
+    .filter(Boolean)
+    .join("; ")
+    .slice(0, 1000);
+  const responsePayload = {
+    ok: true,
+    accepted: true,
+    id: leadId,
+    photo_count: photoCount,
+    class: ai.lead_class,
+    notable: ai.notable,
+    processing_status: processingStatus,
+  };
+  const finished = new Date().toISOString();
+  if (leadDeleted) {
+    await env.LEADS.prepare(
+      `UPDATE lead_continuations SET status='failed',updated_at=?,last_error='lead_deleted'
+       WHERE lead_id=? AND idempotency_key_hash=?`,
+    )
+      .bind(finished, leadId, operation.hash)
+      .run();
+    apiError(410, "lead_deleted");
+  }
+  if (photoFailure) {
+    const results = await env.LEADS.batch([
+      env.LEADS.prepare(
+        `UPDATE leads SET classified_type=?,story=?,maker=?,lead_class=?,interest_score=?,confidence=?,notable=?,summary=?,ai_json=?,photo_count=?,processing_status=?,processing_error=?,processing_updated_at=? WHERE id=? AND deleted_at IS NULL`,
+      ).bind(
+        classifiedType,
+        story,
+        maker,
+        ai.lead_class,
+        ai.interest_score,
+        ai.confidence,
+        ai.notable ? 1 : 0,
+        ai.summary,
+        JSON.stringify(ai),
+        photoCount,
+        processingStatus,
+        processingError,
+        finished,
+        leadId,
+      ),
+      env.LEADS.prepare(
+        `UPDATE lead_continuations SET status='failed',updated_at=?,last_error=?
+         WHERE lead_id=? AND idempotency_key_hash=?`,
+      ).bind(finished, processingError, leadId, operation.hash),
+    ]);
+    if (!Number(results[0]?.meta?.changes || 0)) apiError(410, "lead_deleted");
+    apiError(503, "photo_storage_failed");
+  }
+
+  const results = await env.LEADS.batch([
+    env.LEADS.prepare(
+      `UPDATE leads SET classified_type=?,story=?,maker=?,lead_class=?,interest_score=?,confidence=?,notable=?,summary=?,ai_json=?,photo_count=?,processing_status=?,processing_error=?,processing_updated_at=? WHERE id=? AND deleted_at IS NULL`,
+    ).bind(
       classifiedType,
       story,
       maker,
@@ -638,22 +1692,33 @@ async function continueLead(request, leadId, env) {
       ai.summary,
       JSON.stringify(ai),
       photoCount,
+      processingStatus,
+      processingError,
+      finished,
       leadId,
+    ),
+    env.LEADS.prepare(
+      `UPDATE lead_continuations SET
+        status='complete',updated_at=?,response_json=?,last_error=''
+       WHERE lead_id=? AND idempotency_key_hash=?`,
+    ).bind(
+      finished,
+      JSON.stringify(responsePayload),
+      leadId,
+      operation.hash,
+    ),
+  ]);
+  if (!Number(results[0]?.meta?.changes || 0)) {
+    await env.LEADS.prepare(
+      `UPDATE lead_continuations SET status='failed',updated_at=?,last_error='lead_deleted'
+       WHERE lead_id=? AND idempotency_key_hash=?`,
     )
-    .run();
+      .bind(finished, leadId, operation.hash)
+      .run();
+    apiError(410, "lead_deleted");
+  }
 
-  return json(
-    {
-      ok: true,
-      id: leadId,
-      photo_count: photoCount,
-      class: ai.lead_class,
-      notable: ai.notable,
-    },
-    200,
-    request,
-    env,
-  );
+  return operationResponse(responsePayload, 200, false);
 }
 
 function authorized(request, env) {
@@ -725,7 +1790,7 @@ async function reviewList(request, env) {
   if (cursorValue && !cursor)
     return json({ error: "invalid_cursor" }, 400, request, env);
 
-  const conditions = [];
+  const conditions = ["l.deleted_at IS NULL"];
   const bindings = [];
   const statusFilters = new Set([
     "new",
@@ -778,6 +1843,7 @@ async function reviewList(request, env) {
       SELECT f.*,
         (SELECT p.id FROM photos p
           WHERE p.lead_id = f.id
+            AND COALESCE(p.storage_status, 'ready') IN ('ready','thumbnail_pending')
           ORDER BY p.created_at ASC, p.id ASC LIMIT 1) AS preview_photo_id
       FROM filtered f
       ${cursorWhere}
@@ -798,6 +1864,7 @@ async function reviewList(request, env) {
         SUM(CASE WHEN COALESCE(status, 'new') = 'declined' THEN 1 ELSE 0 END) AS count_declined,
         SUM(CASE WHEN COALESCE(status, 'new') = 'archived' THEN 1 ELSE 0 END) AS count_archived
       FROM leads
+      WHERE deleted_at IS NULL
     ),
     filtered_count AS (SELECT COUNT(*) AS filtered_total FROM filtered)
     SELECT page.*, counts.*, filtered_count.filtered_total
@@ -874,14 +1941,18 @@ async function reviewList(request, env) {
 async function reviewDetail(request, leadId, env) {
   if (!authorized(request, env))
     return reviewAuthError(request, env);
-  const l = await env.LEADS.prepare(`SELECT * FROM leads WHERE id=?`)
+  const l = await env.LEADS.prepare(
+    `SELECT * FROM leads WHERE id=? AND deleted_at IS NULL`,
+  )
     .bind(leadId)
     .first();
   if (!l) return json({ error: "not_found" }, 404, request, env);
   const { results: photos } = await env.LEADS.prepare(
     `SELECT id,kind,label,content_type,created_at,
       CASE WHEN thumbnail_key IS NOT NULL THEN 1 ELSE 0 END AS has_thumbnail
-      FROM photos WHERE lead_id=? ORDER BY created_at, id`,
+      FROM photos WHERE lead_id=? AND
+        COALESCE(storage_status, 'ready') IN ('ready','thumbnail_pending')
+      ORDER BY created_at, id`,
   )
     .bind(leadId)
     .all();
@@ -920,44 +1991,293 @@ async function updateLead(request, leadId, env) {
   ];
   if (!allowed.includes(body.status))
     return json({ error: "invalid_status" }, 400, request, env);
-  await env.LEADS.prepare(`UPDATE leads SET status=? WHERE id=?`)
+  const result = await env.LEADS.prepare(
+    `UPDATE leads SET status=? WHERE id=? AND deleted_at IS NULL`,
+  )
     .bind(body.status, leadId)
     .run();
+  if (!Number(result.meta?.changes || 0))
+    return json({ error: "not_found" }, 404, request, env);
   return json({ ok: true, status: body.status }, 200, request, env);
+}
+
+function objectDeletionStatement(env, { objectKey, leadId }, created) {
+  return env.LEADS.prepare(
+    `INSERT INTO object_deletions
+      (object_key,lead_id,created_at,next_attempt_at)
+     VALUES (?,?,?,?)
+     ON CONFLICT(object_key) DO UPDATE SET
+       lead_id=excluded.lead_id,
+       completed_at=NULL,
+       last_error='',
+       attempts=object_deletions.attempts+1,
+       next_attempt_at=excluded.next_attempt_at`,
+  ).bind(objectKey, leadId, created, created);
+}
+
+async function queueObjectDeletionRows(env, objects, created = new Date().toISOString()) {
+  const unique = [
+    ...new Map(
+      objects
+        .filter(({ objectKey, leadId }) => objectKey && leadId)
+        .map((item) => [`${item.leadId}\n${item.objectKey}`, item]),
+    ).values(),
+  ];
+  const statements = unique.map((item) =>
+    objectDeletionStatement(env, item, created),
+  );
+  for (let index = 0; index < statements.length; index += 80)
+    await env.LEADS.batch(statements.slice(index, index + 80));
+}
+
+async function queueObjectDeletions(env, leadId, objectKeys) {
+  // A very late R2 put can finish after stale-upload maintenance finalized the
+  // original tombstone. Recreate a PII-free deletion anchor so that even a
+  // failed compensating delete remains autonomously retryable.
+  await env.LEADS.prepare(
+    `INSERT INTO leads
+      (id,created_at,status,processing_status,processing_error,deleted_at,deletion_status)
+     VALUES (?,?,'archived','failed','late_deleted_upload',?,'pending')
+     ON CONFLICT(id) DO NOTHING`,
+  )
+    .bind(leadId, new Date().toISOString(), new Date().toISOString())
+    .run();
+  await queueObjectDeletionRows(
+    env,
+    objectKeys.filter(Boolean).map((objectKey) => ({ objectKey, leadId })),
+  );
+}
+
+async function finalizeTombstones(env, leadIds) {
+  for (const leadId of [...new Set(leadIds)]) {
+    const row = await env.LEADS.prepare(
+      `SELECT
+        l.deletion_status,
+        (SELECT COUNT(*) FROM object_deletions d
+          WHERE d.lead_id=l.id AND d.completed_at IS NULL) AS pending,
+        (SELECT COUNT(*) FROM photos p
+          WHERE p.lead_id=l.id AND p.storage_status IN
+            ('pending','thumbnail_pending')) AS in_flight
+       FROM leads l WHERE l.id=? AND l.deleted_at IS NOT NULL`,
+    )
+      .bind(leadId)
+      .first();
+    if (
+      !row ||
+      Number(row.pending || 0) > 0 ||
+      Number(row.in_flight || 0) > 0
+    )
+      continue;
+    await env.LEADS.batch([
+      env.LEADS.prepare(`DELETE FROM photos WHERE lead_id=?`).bind(leadId),
+      env.LEADS.prepare(`DELETE FROM lead_continuations WHERE lead_id=?`).bind(
+        leadId,
+      ),
+      env.LEADS.prepare(`DELETE FROM object_deletions WHERE lead_id=?`).bind(
+        leadId,
+      ),
+      env.LEADS.prepare(`DELETE FROM leads WHERE id=?`).bind(leadId),
+    ]);
+  }
+}
+
+async function processDeletionQueue(env, leadIds = [], limit = 50) {
+  const ids = [...new Set(leadIds)].slice(0, 100);
+  const idWhere = ids.length
+    ? `AND d.lead_id IN (${ids.map(() => "?").join(",")})`
+    : "";
+  const now = new Date().toISOString();
+  const { results = [] } = await env.LEADS.prepare(
+    `SELECT d.id,d.object_key,d.lead_id,d.attempts
+     FROM object_deletions d
+     INNER JOIN leads l ON l.id=d.lead_id
+     WHERE d.completed_at IS NULL AND d.next_attempt_at<=? ${idWhere}
+       AND (
+         l.deleted_at IS NOT NULL OR NOT EXISTS (
+           SELECT 1 FROM photos p
+           WHERE p.lead_id=d.lead_id AND
+             (p.object_key=d.object_key OR p.thumbnail_key=d.object_key)
+         )
+       )
+     ORDER BY d.next_attempt_at,d.id
+     LIMIT ?`,
+  )
+    .bind(now, ...ids, Math.max(1, Math.min(100, limit)))
+    .all();
+
+  const outcomes = await Promise.all(
+    results.map(async (row) => {
+      try {
+        await env.PHOTOS.delete(row.object_key);
+        return { row, ok: true };
+      } catch (error) {
+        console.error("R2 delete failed", row.lead_id, row.object_key, error);
+        return { row, ok: false, error };
+      }
+    }),
+  );
+  const updates = outcomes.map(({ row, ok, error }) => {
+    if (ok)
+      return env.LEADS.prepare(
+        `UPDATE object_deletions
+         SET completed_at=?,attempts=attempts+1,last_error=''
+         WHERE id=? AND completed_at IS NULL AND attempts=?`,
+      ).bind(new Date().toISOString(), row.id, Number(row.attempts || 0));
+    const attempts = Number(row.attempts || 0) + 1;
+    const delaySeconds = Math.min(24 * 60 * 60, 60 * 2 ** Math.min(10, attempts));
+    const nextAttempt = new Date(Date.now() + delaySeconds * 1000).toISOString();
+    return env.LEADS.prepare(
+      `UPDATE object_deletions
+       SET attempts=attempts+1,last_error=?,next_attempt_at=?
+       WHERE id=? AND completed_at IS NULL AND attempts=?`,
+    ).bind(
+      String(error).slice(0, 1000),
+      nextAttempt,
+      row.id,
+      Number(row.attempts || 0),
+    );
+  });
+  if (updates.length) await env.LEADS.batch(updates);
+  await finalizeTombstones(env, [
+    ...ids,
+    ...results.map((row) => row.lead_id),
+  ]);
+}
+
+async function retryPendingDeletions(env) {
+  const now = new Date().toISOString();
+  const { results = [] } = await env.LEADS.prepare(
+    `SELECT DISTINCT d.lead_id
+     FROM object_deletions d
+     INNER JOIN leads l ON l.id=d.lead_id
+     WHERE d.completed_at IS NULL AND d.next_attempt_at<=?
+       AND (
+         l.deleted_at IS NOT NULL OR NOT EXISTS (
+           SELECT 1 FROM photos p
+           WHERE p.lead_id=d.lead_id AND
+             (p.object_key=d.object_key OR p.thumbnail_key=d.object_key)
+         )
+       )
+     ORDER BY d.next_attempt_at
+     LIMIT 10`,
+  )
+    .bind(now)
+    .all();
+  if (results.length)
+    await processDeletionQueue(
+      env,
+      results.map((row) => row.lead_id),
+      50,
+    );
+}
+
+async function recoverStaleTombstoneUploads(env) {
+  const cutoff = new Date(Date.now() - STALE_UPLOAD_MS).toISOString();
+  const { results = [] } = await env.LEADS.prepare(
+    `SELECT p.id,p.lead_id,p.object_key,p.thumbnail_key,p.storage_status
+     FROM photos p
+     INNER JOIN leads l ON l.id=p.lead_id AND l.deleted_at IS NOT NULL
+     WHERE
+       (p.storage_status='pending' AND p.created_at<=?) OR
+       (p.storage_status='thumbnail_pending' AND p.storage_error<=?)
+     ORDER BY p.created_at,p.id
+     LIMIT 100`,
+  )
+    .bind(cutoff, cutoff)
+    .all();
+  if (!results.length) return;
+  await queueObjectDeletionRows(
+    env,
+    results.flatMap((row) =>
+      [row.object_key, row.thumbnail_key]
+        .filter(Boolean)
+        .map((objectKey) => ({ objectKey, leadId: row.lead_id })),
+    ),
+  );
+  await env.LEADS.batch(
+    results.map((row) =>
+      env.LEADS.prepare(
+        `UPDATE photos SET storage_status='failed',storage_error='stale_deleted_upload'
+         WHERE id=? AND lead_id=? AND storage_status=?`,
+      ).bind(row.id, row.lead_id, row.storage_status),
+    ),
+  );
+  await processDeletionQueue(
+    env,
+    results.map((row) => row.lead_id),
+    100,
+  );
+}
+
+async function cleanupJournals(env) {
+  const cutoff = new Date(Date.now() - JOURNAL_RETENTION_MS).toISOString();
+  await env.LEADS.batch([
+    env.LEADS.prepare(
+      `DELETE FROM lead_continuations
+       WHERE status IN ('complete','failed') AND updated_at<?`,
+    ).bind(cutoff),
+    env.LEADS.prepare(
+      `DELETE FROM object_deletions
+       WHERE completed_at IS NOT NULL AND completed_at<?`,
+    ).bind(cutoff),
+  ]);
+}
+
+async function runScheduledMaintenance(env) {
+  await recoverStaleTombstoneUploads(env);
+  await retryPendingDeletions(env);
+  await cleanupJournals(env);
 }
 
 async function deleteLeadsByIds(env, leadIds) {
   const placeholders = leadIds.map(() => "?").join(",");
+  const created = new Date().toISOString();
+  // Tombstone first. Every photo reservation checks the same row, so after
+  // this write commits no continuation can create a new untracked R2 key.
+  await env.LEADS.prepare(
+    `UPDATE leads SET
+      deleted_at=?,deletion_status='pending',status='archived',
+      name='',email='',phone='',city='',story='',maker='',summary='',ai_json='{}',
+      processing_error='',make_error=''
+     WHERE id IN (${placeholders}) AND deleted_at IS NULL`,
+  )
+    .bind(created, ...leadIds)
+    .run();
   const { results: photos } = await env.LEADS.prepare(
-    `SELECT object_key,thumbnail_key FROM photos WHERE lead_id IN (${placeholders})`,
+    `SELECT lead_id,object_key,thumbnail_key FROM photos WHERE lead_id IN (${placeholders})`,
   )
     .bind(...leadIds)
     .all();
-  const objectKeys = photos.flatMap((photo) =>
-    [photo.object_key, photo.thumbnail_key].filter(Boolean),
+  const objects = photos.flatMap((photo) =>
+    [photo.object_key, photo.thumbnail_key]
+      .filter(Boolean)
+      .map((objectKey) => ({ objectKey, leadId: photo.lead_id })),
   );
-  const deletions = await Promise.allSettled(
-    objectKeys.map((objectKey) => env.PHOTOS.delete(objectKey)),
-  );
-  for (const deletion of deletions) {
-    if (deletion.status === "rejected")
-      console.error("R2 delete failed", deletion.reason);
-  }
-  await env.LEADS.batch([
-    env.LEADS.prepare(
-      `DELETE FROM photos WHERE lead_id IN (${placeholders})`,
-    ).bind(...leadIds),
-    env.LEADS.prepare(`DELETE FROM leads WHERE id IN (${placeholders})`).bind(
-      ...leadIds,
-    ),
-  ]);
+  await queueObjectDeletionRows(env, objects, created);
+  await processDeletionQueue(env, leadIds, 50);
+  const row = await env.LEADS.prepare(
+    `SELECT COUNT(*) AS pending FROM leads
+     WHERE id IN (${placeholders}) AND deleted_at IS NOT NULL`,
+  )
+    .bind(...leadIds)
+    .first();
+  return { pending: Number(row?.pending || 0) };
 }
 
 async function deleteLead(request, leadId, env) {
   if (!authorized(request, env))
     return reviewAuthError(request, env);
-  await deleteLeadsByIds(env, [leadId]);
-  return json({ ok: true }, 200, request, env);
+  const result = await deleteLeadsByIds(env, [leadId]);
+  return json(
+    {
+      ok: true,
+      accepted: true,
+      deletion_pending: result.pending > 0,
+    },
+    result.pending > 0 ? 202 : 200,
+    request,
+    env,
+  );
 }
 
 async function bulkReviewAction(request, env) {
@@ -994,10 +2314,18 @@ async function bulkReviewAction(request, env) {
       .bind(...ids)
       .all();
     const existingIds = results.map((row) => row.id);
-    if (existingIds.length) await deleteLeadsByIds(env, existingIds);
+    const result = existingIds.length
+      ? await deleteLeadsByIds(env, existingIds)
+      : { pending: 0 };
     return json(
-      { ok: true, action: "delete", count: existingIds.length },
-      200,
+      {
+        ok: true,
+        accepted: true,
+        action: "delete",
+        count: existingIds.length,
+        deletion_pending: result.pending > 0,
+      },
+      result.pending > 0 ? 202 : 200,
       request,
       env,
     );
@@ -1050,76 +2378,196 @@ async function servePhoto(request, photoId, env) {
 
 async function savePhotoThumbnail(request, photoId, env) {
   if (!authorized(request, env)) return reviewAuthError(request, env);
-  const contentType = request.headers.get("Content-Type") || "";
+  const contentType = (request.headers.get("Content-Type") || "").toLowerCase();
   const contentLength = Number(request.headers.get("Content-Length") || 0);
-  if (!contentType.startsWith("image/") || contentLength > 2 * 1024 * 1024)
+  if (
+    !ALLOWED_IMAGE_TYPES.has(contentType) ||
+    contentLength > MAX_THUMBNAIL_BYTES
+  )
+    return json({ error: "invalid_thumbnail" }, 400, request, env);
+  const bytes = await request.arrayBuffer();
+  if (!bytes.byteLength || bytes.byteLength > MAX_THUMBNAIL_BYTES)
+    return json({ error: "invalid_thumbnail" }, 400, request, env);
+  if (!imageSignatureMatches(new Uint8Array(bytes.slice(0, 12)), contentType))
     return json({ error: "invalid_thumbnail" }, 400, request, env);
   const row = await env.LEADS.prepare(
-    `SELECT object_key,thumbnail_key FROM photos WHERE id=?`,
+    `SELECT p.object_key,p.thumbnail_key,p.lead_id
+     FROM photos p
+     INNER JOIN leads l ON l.id=p.lead_id AND l.deleted_at IS NULL
+     WHERE p.id=?`,
   )
     .bind(photoId)
     .first();
   if (!row) return json({ error: "not_found" }, 404, request, env);
-  const bytes = await request.arrayBuffer();
-  if (!bytes.byteLength || bytes.byteLength > 2 * 1024 * 1024)
-    return json({ error: "invalid_thumbnail" }, 400, request, env);
+  const claimedAt = new Date().toISOString();
+  const claimed = await env.LEADS.prepare(
+    `UPDATE photos SET storage_status='thumbnail_pending',storage_error=?
+     WHERE id=? AND lead_id=? AND storage_status='ready' AND EXISTS (
+       SELECT 1 FROM leads WHERE id=? AND deleted_at IS NULL
+     )`,
+  )
+    .bind(claimedAt, photoId, row.lead_id, row.lead_id)
+    .run();
+  if (!Number(claimed.meta?.changes || 0))
+    return json({ error: "photo_busy" }, 409, request, env);
   const slash = row.object_key.lastIndexOf("/");
   const prefix = slash >= 0 ? row.object_key.slice(0, slash + 1) : "";
-  const thumbnailKey = `${prefix}${photoId}-thumb.jpg`;
-  await env.PHOTOS.put(thumbnailKey, bytes, {
-    httpMetadata: { contentType },
-  });
-  await env.LEADS.prepare(`UPDATE photos SET thumbnail_key=? WHERE id=?`)
-    .bind(thumbnailKey, photoId)
-    .run();
+  const extension =
+    contentType === "image/png"
+      ? "png"
+      : contentType === "image/webp"
+        ? "webp"
+        : "jpg";
+  const thumbnailKey = `${prefix}${photoId}-thumb.${extension}`;
+  try {
+    await env.PHOTOS.put(thumbnailKey, bytes, {
+      httpMetadata: { contentType },
+    });
+  } catch (error) {
+    const active = await activeLeadExists(env, row.lead_id);
+    await env.LEADS.prepare(
+      `UPDATE photos SET storage_status=?,storage_error=?
+       WHERE id=? AND lead_id=? AND storage_status='thumbnail_pending'`,
+    )
+      .bind(
+        active ? "ready" : "failed",
+        active ? String(error).slice(0, 1000) : "lead_deleted",
+        photoId,
+        row.lead_id,
+      )
+      .run();
+    if (!active) {
+      await queueObjectDeletions(env, row.lead_id, [
+        row.object_key,
+        row.thumbnail_key,
+        thumbnailKey,
+      ]);
+      await processDeletionQueue(env, [row.lead_id], 10);
+      return json({ error: "lead_deleted" }, 410, request, env);
+    }
+    throw error;
+  }
+  const switchedAt = new Date().toISOString();
+  const switchStatements = [
+    env.LEADS.prepare(
+      `UPDATE photos
+       SET thumbnail_key=?,storage_status='ready',storage_error=''
+       WHERE id=? AND lead_id=? AND storage_status='thumbnail_pending' AND EXISTS (
+         SELECT 1 FROM leads WHERE id=? AND deleted_at IS NULL
+       )`,
+    ).bind(thumbnailKey, photoId, row.lead_id, row.lead_id),
+  ];
   if (row.thumbnail_key && row.thumbnail_key !== thumbnailKey)
-    await env.PHOTOS.delete(row.thumbnail_key);
+    switchStatements.push(
+      objectDeletionStatement(
+        env,
+        { objectKey: row.thumbnail_key, leadId: row.lead_id },
+        switchedAt,
+      ),
+    );
+  let switchResults;
+  try {
+    switchResults = await env.LEADS.batch(switchStatements);
+  } catch (error) {
+    const active = await activeLeadExists(env, row.lead_id);
+    await env.LEADS.prepare(
+      `UPDATE photos SET storage_status=?,storage_error=?
+       WHERE id=? AND lead_id=? AND storage_status='thumbnail_pending'`,
+    )
+      .bind(
+        active ? "ready" : "failed",
+        active ? "thumbnail_switch_failed" : "lead_deleted",
+        photoId,
+        row.lead_id,
+      )
+      .run();
+    await queueObjectDeletions(env, row.lead_id, [thumbnailKey]);
+    await processDeletionQueue(env, [row.lead_id], 10);
+    throw error;
+  }
+  const updated = switchResults[0];
+  if (!Number(updated.meta?.changes || 0)) {
+    await env.LEADS.prepare(
+      `UPDATE photos SET storage_status='failed',storage_error='lead_deleted'
+       WHERE id=? AND lead_id=? AND storage_status='thumbnail_pending'`,
+    )
+      .bind(photoId, row.lead_id)
+      .run();
+    await queueObjectDeletions(env, row.lead_id, [
+      row.object_key,
+      row.thumbnail_key,
+      thumbnailKey,
+    ]);
+    await processDeletionQueue(env, [row.lead_id], 10);
+    return json({ error: "lead_deleted" }, 410, request, env);
+  }
+  if (row.thumbnail_key && row.thumbnail_key !== thumbnailKey)
+    await processDeletionQueue(env, [row.lead_id], 10);
   return json({ ok: true, id: photoId }, 200, request, env);
 }
 
 export default {
+  async scheduled(_controller, env, ctx) {
+    const maintenance = runScheduledMaintenance(env).catch((error) => {
+      console.error("Scheduled maintenance failed", error);
+      throw error;
+    });
+    if (ctx?.waitUntil) ctx.waitUntil(maintenance);
+    else await maintenance;
+  },
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    if (request.method === "OPTIONS")
+    if (request.method === "OPTIONS") {
+      if (!isAllowedOrigin(request, env))
+        return json({ error: "origin_not_allowed" }, 403, request, env);
       return new Response(null, { headers: cors(request, env) });
+    }
     try {
       if (url.pathname === "/api/health")
         return json({ ok: true }, 200, request, env);
       if (url.pathname === "/api/photo-check" && request.method === "POST")
-        return photoCheck(request, env);
+        return await photoCheck(request, env);
       if (url.pathname === "/api/leads" && request.method === "POST")
-        return createLead(request, env, ctx);
+        return await createLead(request, env, ctx);
       const continuation = url.pathname.match(/^\/api\/leads\/([^/]+)\/continue$/);
       if (continuation && request.method === "POST")
-        return continueLead(
+        return await continueLead(
           request,
           decodeURIComponent(continuation[1]),
           env,
         );
       if (url.pathname === "/api/review" && request.method === "GET")
-        return reviewList(request, env);
+        return await reviewList(request, env);
       if (url.pathname === "/api/review/bulk" && request.method === "POST")
-        return bulkReviewAction(request, env);
+        return await bulkReviewAction(request, env);
       const thumbnail = url.pathname.match(
         /^\/api\/review\/photo\/([^/]+)\/thumbnail$/,
       );
       if (thumbnail && request.method === "PUT")
-        return savePhotoThumbnail(
+        return await savePhotoThumbnail(
           request,
           decodeURIComponent(thumbnail[1]),
           env,
         );
       const detail = url.pathname.match(/^\/api\/review\/([^/]+)$/);
       if (detail && request.method === "GET")
-        return reviewDetail(request, decodeURIComponent(detail[1]), env);
+        return await reviewDetail(request, decodeURIComponent(detail[1]), env);
       if (detail && request.method === "PATCH")
-        return updateLead(request, decodeURIComponent(detail[1]), env);
+        return await updateLead(request, decodeURIComponent(detail[1]), env);
       if (detail && request.method === "DELETE")
-        return deleteLead(request, decodeURIComponent(detail[1]), env);
+        return await deleteLead(request, decodeURIComponent(detail[1]), env);
       if (url.pathname.startsWith("/api/photo/") && request.method === "GET")
-        return servePhoto(request, url.pathname.split("/").pop(), env);
+        return await servePhoto(request, url.pathname.split("/").pop(), env);
       return json({ error: "not found" }, 404, request, env);
     } catch (e) {
+      if (e instanceof ApiError)
+        return json(
+          { error: e.code },
+          e.status,
+          request,
+          env,
+          e.headers,
+        );
       console.error(e);
       return json({ error: "server_error" }, 500, request, env);
     }

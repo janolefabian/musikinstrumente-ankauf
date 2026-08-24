@@ -83,8 +83,11 @@
     },
   ];
 
+  // Keep the privileged review credential only for the current tab session.
+  // Remove the former persistent copy once so an old token is not left behind.
+  localStorage.removeItem("review-token");
   let leads = [];
-  let token = localStorage.getItem("review-token") || "";
+  let token = sessionStorage.getItem("review-token") || "";
   let currentFilter = "all";
   let currentQuery = "";
   let selectedId = null;
@@ -318,7 +321,7 @@
       <div class="review-auth-state">
         <p class="eyebrow">Interner Bereich</p>
         <h2>Dashboard entsperren</h2>
-        <p>Geben Sie den Review-Zugangsschlüssel ein. Er wird nur für dieses interne Dashboard verwendet.</p>
+        <p>Geben Sie den Review-Zugangsschlüssel ein. Er bleibt nur für diese Browsersitzung gespeichert.</p>
         <form data-review-login>
           <label for="review-access-token">Zugangsschlüssel</label>
           <input id="review-access-token" type="password" autocomplete="current-password" required data-review-token>
@@ -334,7 +337,7 @@
       const entered = input.value.trim();
       if (!entered) return;
       token = entered;
-      localStorage.setItem("review-token", token);
+      sessionStorage.setItem("review-token", token);
       await loadLeads({ reset: true });
     };
     input.focus();
@@ -572,6 +575,7 @@
         if (error.status === 401) {
           const invalid = Boolean(token);
           token = "";
+          sessionStorage.removeItem("review-token");
           localStorage.removeItem("review-token");
           renderAuthGate(invalid);
           return;

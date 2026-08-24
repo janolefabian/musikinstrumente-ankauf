@@ -10,6 +10,10 @@
     "REVIEW_BASE_URL": "https://musikinstrument-ankauf.de",
   },
 
+  "triggers": {
+    "crons": ["*/15 * * * *"],
+  },
+
   "r2_buckets": [
     {
       "binding": "PHOTOS",
@@ -22,6 +26,8 @@
       "binding": "LEADS",
       "database_name": "musikinstrument-ankauf-leads",
       "database_id": "36171733-d97d-466c-aab2-60b2788b09bc",
+      "migrations_dir": "schema/migrations",
+      "migrations_table": "d1_migrations",
     },
   ],
 }

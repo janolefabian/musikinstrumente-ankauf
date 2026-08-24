@@ -7,8 +7,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
@@ -28,7 +26,8 @@ jobs:
 
       - run: npm ci
 
-      - run: npm run build
+      - name: Test, validate Worker bundle and build site
+        run: npm run check
         env:
           PUBLIC_API_BASE: ${{ vars.PUBLIC_API_BASE }}
 
@@ -39,6 +38,11 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
 
     environment:
       name: github-pages

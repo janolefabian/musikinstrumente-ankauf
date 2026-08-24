@@ -64,18 +64,24 @@ cp .dev.vars.example .dev.vars
 
 1. R2-Bucket `musikinstrument-ankauf-photos` anlegen.
 2. D1-Datenbank `musikinstrument-ankauf-leads` anlegen und ID in `worker/wrangler.jsonc` einsetzen.
-3. Schema anwenden:
+3. Eine neue lokale D1-Datenbank und alle späteren Änderungen werden immer über
+   dieselbe Migrationskette eingerichtet:
 
 ```bash
-npx wrangler d1 execute LEADS --remote --file=./schema/schema.sql
+npm run worker:db:init
 ```
 
-Bei einer bereits bestehenden D1-Datenbank stattdessen vor dem Worker-Deploy
-die neue Migration anwenden:
+Für eine neue Remote-Datenbank oder eine bereits korrekt in der
+Migrationshistorie geführte Datenbank gilt vor dem Worker-Deploy:
 
 ```bash
-npx wrangler d1 execute LEADS --remote --file=./schema/migrations/0002_photo_thumbnails_and_review_indexes.sql
+npm run worker:db:migrate:remote
 ```
+
+`worker/schema/schema.sql` ist nur die überprüfbare Momentaufnahme des
+Endschemas und kein Bootstrap-Befehl. Die einmalige Übernahme der schon vor dem
+Migrationssystem angelegten Produktionsdatenbank ist sicherheitskritisch und
+steht Schritt für Schritt in [`docs/worker-release.md`](docs/worker-release.md).
 
 4. Secrets setzen:
 

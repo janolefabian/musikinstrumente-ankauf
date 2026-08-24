@@ -18,7 +18,7 @@ const local = Boolean(cityName);
   <div class="hero-content">
     <p class="eyebrow hero-eyebrow">{local ? `Musikinstrument verkaufen in ${cityName}` : 'Musikinstrumente verkaufen'}</p>
     <h1>{local ? `Instrument aus ${cityName} zum Ankauf anbieten` : 'Musikinstrument verkaufen – einfach mit Fotos starten'}</h1>
-    <p>Wir kaufen vor allem Streichinstrumente, Bögen, Kontrabässe und musikalische Nachlässe. Schicken Sie uns zunächst einige Fotos – Hersteller, Alter oder Wert müssen Sie nicht selbst bestimmen. Wenn ein Ankauf infrage kommt, stimmen wir Prüfung, Angebot und Übergabe persönlich mit Ihnen ab.</p>
+    <p>Schicken Sie uns einige Fotos Ihres Instruments. Hersteller, Alter oder Wert müssen Sie nicht kennen – wir prüfen persönlich und melden uns mit den nächsten Schritten.</p>
     <a class="button primary" href={`/instrument-verkaufen/${local ? `?city=${encodeURIComponent(cityName)}` : ''}`}>Instrument zum Ankauf anbieten</a>
     <div class="trust-row" aria-label="Vorteile">
       <span>Deutschlandweit online starten</span>

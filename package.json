@@ -10,9 +10,19 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
+    "test": "npm run test:root && npm run worker:test",
+    "test:root": "node --no-warnings --test tests/*.test.mjs",
+    "test:security": "node --no-warnings --test tests/frontend-security.test.mjs tests/worker-contracts.test.mjs",
+    "test:migrations": "node --no-warnings --test tests/migrations.test.mjs",
+    "check": "npm run test && npm run worker:check && npm run build",
+    "smoke:worker": "node scripts/smoke-worker.mjs",
     "worker:dev": "npm --workspace worker run dev",
+    "worker:test": "npm --workspace worker run test",
+    "worker:check": "npm --workspace worker run check",
     "worker:deploy": "npm --workspace worker run deploy",
-    "worker:db:init": "npm --workspace worker run db:init"
+    "worker:db:init": "npm --workspace worker run db:init",
+    "worker:db:migrate:local": "npm --workspace worker run db:migrate:local",
+    "worker:db:migrate:remote": "npm --workspace worker run db:migrate:remote"
   },
   "dependencies": {
     "@astrojs/sitemap": "^3.7.3",

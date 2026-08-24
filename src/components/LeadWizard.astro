@@ -2,11 +2,12 @@
 const apiBase = import.meta.env.PUBLIC_API_BASE || '';
 ---
 <section class="wizard-shell" data-lead-wizard data-api-base={apiBase}>
-  <div class="wizard-progress"><span data-progress-fill></span></div>
-  <div class="wizard-card" aria-live="polite">
+  <p class="wizard-progress-label" id="wizard-progress-label" data-progress-label>Kategorie auswählen</p>
+  <div class="wizard-progress" role="progressbar" aria-labelledby="wizard-progress-label" aria-valuemin="0" aria-valuemax="100" aria-valuenow="8"><span data-progress-fill></span></div>
+  <div class="wizard-card">
     <button class="wizard-back" type="button" data-back hidden>← Zurück</button>
-    <div data-wizard-stage></div>
+    <div data-wizard-stage tabindex="-1"></div>
   </div>
   <noscript>Für den geführten Foto-Assistenten muss JavaScript aktiviert sein.</noscript>
 </section>
-<script src="/js/lead-wizard.js" is:inline></script>
+<script src="/js/lead-wizard.js?v=20260825-1" is:inline></script>

@@ -98,7 +98,7 @@ select {
   border-radius: 999px;
 }
 .hero {
-  min-height: 690px;
+  min-height: min(650px, calc(100svh - 72px));
   display: grid;
   place-items: center;
   position: relative;
@@ -127,7 +127,7 @@ select {
   width: min(820px, calc(100% - 40px));
   margin-right: auto;
   margin-left: clamp(20px, 9vw, 145px);
-  padding: 80px 0;
+  padding: 62px 0;
 }
 .hero h1 {
   font-size: clamp(44px, 7vw, 82px);
@@ -137,7 +137,7 @@ select {
 }
 .hero p {
   font-size: clamp(18px, 2vw, 23px);
-  max-width: 700px;
+  max-width: 650px;
 }
 .eyebrow {
   text-transform: uppercase;
@@ -666,6 +666,12 @@ select {
   overflow: hidden;
   margin-bottom: 20px;
 }
+.wizard-progress-label {
+  margin: 0 0 7px;
+  color: var(--muted);
+  font-family: Arial, sans-serif;
+  font-size: 12px;
+}
 .wizard-progress span {
   display: block;
   height: 100%;
@@ -696,6 +702,9 @@ select {
 .wizard-copy {
   color: #555;
   margin-bottom: 28px;
+}
+.wizard-choice-intro {
+  max-width: 600px;
 }
 .save-note {
   display: grid;
@@ -759,6 +768,14 @@ select {
   border-radius: 4px;
   cursor: pointer;
 }
+.photo-button:disabled,
+.continue-button:disabled,
+.submit-button:disabled,
+.ghost-button:disabled,
+.wizard-back:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
 .ghost-button {
   border: 1px solid var(--line);
   background: white;
@@ -783,17 +800,22 @@ select {
 .help-example {
   display: grid;
   place-items: center;
-  width: min(100%, 360px);
-  aspect-ratio: 2 / 3;
+  position: relative;
+  width: min(100%, 300px);
+  height: 220px;
   margin: 14px auto 0;
   overflow: hidden;
   border-radius: 6px;
   background: #dde7e5;
 }
 .help-example img {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
+  max-height: 100%;
+  margin: 0;
   object-fit: contain;
 }
 .help-placeholder {
@@ -824,6 +846,22 @@ select {
 .quality.checking {
   background: #f3f2ee;
   color: #666;
+}
+.quality-actions {
+  margin-top: 10px;
+}
+.preview-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.preview-thumbs img {
+  width: 64px;
+  height: 64px;
+  margin: 0;
+  border-radius: 6px;
+  object-fit: cover;
 }
 .field {
   display: grid;
@@ -863,6 +901,23 @@ select {
   font-size: 13px;
   color: var(--muted);
   font-family: Arial, sans-serif;
+}
+.consent-field {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  color: #4f4f4f;
+  font-family: Arial, sans-serif;
+  font-size: 13px;
+}
+.consent-field input {
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+}
+.mini-note a {
+  color: var(--accent-dark);
 }
 .early-submit {
   margin-top: 24px;
@@ -952,6 +1007,20 @@ select {
 }
 .saved-actions .continuation-unavailable {
   margin: 0;
+}
+.done-details {
+  margin: 26px 0 12px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  background: #faf9f6;
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+}
+.done-details p {
+  margin: 0;
+}
+.done-details p + p {
+  margin-top: 8px;
 }
 .review-page {
   max-width: 1280px;
@@ -1222,10 +1291,31 @@ select {
     grid-template-columns: 1fr;
   }
   .hero {
-    min-height: 620px;
+    min-height: auto;
   }
   .hero-content {
     margin-left: 20px;
+    padding: 42px 0 48px;
+  }
+  .hero h1 {
+    font-size: clamp(36px, 12vw, 52px);
+  }
+  .hero p {
+    font-size: 18px;
+    line-height: 1.48;
+  }
+  .trust-row {
+    gap: 8px 20px;
+    margin-top: 22px;
+  }
+  .wizard-intro {
+    margin-top: 44px;
+  }
+  .wizard-card {
+    min-height: 0;
+  }
+  .help-example {
+    height: 200px;
   }
   .site-footer {
     flex-direction: column;
