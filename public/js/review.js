@@ -570,7 +570,9 @@
       renderList();
     } catch (error) {
       if (sequence !== requestSequence) return;
-      console.error(error);
+      // A missing or expired review key is an expected login state, not a
+      // dashboard failure worth reporting in the browser console.
+      if (error.status !== 401) console.error(error);
       if (reset) {
         if (error.status === 401) {
           const invalid = Boolean(token);
