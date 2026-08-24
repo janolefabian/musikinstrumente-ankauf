@@ -85,40 +85,19 @@ test("photo quality warnings have a user-controlled override", async () => {
   assert.match(source, /(?:Foto\s+)?trotzdem\s+verwenden/i);
 });
 
-test("automatic photo checks require a separate optional consent in the photo step", async () => {
+test("automatic photo checks run without an extra checkbox and remain transparent", async () => {
   const source = await readFile(wizardPath, "utf8");
   const styles = await readFile(stylesPath, "utf8");
-  assert.match(source, /data-photo-check-consent/);
-  assert.match(source, /Automatische Foto-Prüfung nutzen/);
+  assert.doesNotMatch(source, /data-photo-check-consent/);
+  assert.doesNotMatch(source, /Automatische Foto-Prüfung nutzen/);
+  assert.match(source, /automatisch auf Erkennbarkeit geprüft/);
   assert.match(source, /verkleinerte Kopie[\s\S]*?OpenAI/);
-  assert.match(source, /Ohne Zustimmung[\s\S]*?technische Merkmale[\s\S]*?Browser/);
-  assert.match(source, /aria-describedby="photo-check-consent-note"/);
-  assert.match(
-    source,
-    /state\.photoCheckConsentAccepted\s*=\s*photoCheckConsentInput\.checked/,
-  );
-  assert.match(
-    source,
-    /const photoCheckConsent\s*=\s*!state\.consentAccepted/,
-    "the early AI-consent choice should disappear after the general consent",
-  );
-  assert.match(
-    styles,
-    /\.photo-check-consent\s*\{[\s\S]*?grid-template-columns:[\s\S]*?minmax\(0,\s*1fr\)/,
-  );
-  assert.match(styles, /\.photo-check-consent input:focus-visible/);
+  assert.match(source, /class="photo-check-note"/);
+  assert.match(styles, /\.photo-check-note\s*\{/);
 });
 
-test("local-only photo checks never claim that an image is good", async () => {
+test("photo checks never use the former unconditional success copy", async () => {
   const source = await readFile(wizardPath, "utf8");
-  const handleStart = source.indexOf("async function handlePhoto");
-  const handleEnd = source.indexOf("\n  function simpleScreen", handleStart);
-  const handleSource = source.slice(handleStart, handleEnd);
-  assert.ok(handleStart >= 0 && handleEnd > handleStart);
-  assert.match(
-    handleSource,
-    /lokale technische Prüfung war unauffällig[\s\S]*?Bildinhalt wurde nicht automatisch geprüft/,
-  );
   assert.doesNotMatch(source, /Das Foto ist gut brauchbar\./);
 });
 
@@ -129,7 +108,7 @@ test("the first and last relevant photo can reach AI while accessories remain lo
   const handleSource = source.slice(handleStart, handleEnd);
   assert.match(
     handleSource,
-    /\(state\.photoCheckConsentAccepted\s*\|\|\s*state\.consentAccepted\)\s*&&[\s\S]*?item\[0\]\s*!==\s*"accessories"[\s\S]*?isAIType\(state\.type\)/,
+    /const shouldUseAi\s*=\s*item\[0\]\s*!==\s*"accessories"\s*&&\s*isAIType\(state\.type\)/,
   );
   assert.doesNotMatch(handleSource, /state\.photoIndex\s*===\s*flow\(\)\.length\s*-\s*1/);
   assert.match(
