@@ -172,6 +172,7 @@
   const initialType = VALID_TYPES.has(requestedType) ? requestedType : null;
   const initialCity = (params.get("city") || "").trim().slice(0, 120);
   const activeObjectUrls = new Set();
+  const trackedFunnelEvents = new Set();
   let shouldFocusStage = false;
 
   const state = {
@@ -199,6 +200,31 @@
     requestKey: null,
     continuationRequestKey: null,
   };
+
+  function funnelDeviceType() {
+    if (window.innerWidth <= 640) return "mobile";
+    if (window.innerWidth <= 1024) return "tablet";
+    return "desktop";
+  }
+  function trackFunnel(event, instrumentType = state.type) {
+    if (!apiBase || trackedFunnelEvents.has(event)) return;
+    trackedFunnelEvents.add(event);
+    const type = VALID_TYPES.has(instrumentType)
+      ? instrumentType
+      : "unselected";
+    void fetch(`${apiBase}/api/funnel`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        event,
+        instrument_type: type,
+        device_type: funnelDeviceType(),
+      }),
+      keepalive: true,
+    }).catch(() => {
+      // Analytics must never interrupt or slow down the enquiry.
+    });
+  }
 
   function isAIType(type) {
     return ["double_bass", "bow", "strings", "estate", "unknown"].includes(
@@ -329,6 +355,7 @@
     return true;
   }
   function finish() {
+    trackFunnel("flow_completed");
     clearContinuation();
     state.history = [];
     state.step = "done";
@@ -385,6 +412,7 @@
     state.classifiedType = null;
     state.photoIndex = 0;
     state.photos = [];
+    trackFunnel("type_selected", type);
     if (isAIType(type)) push("photos");
     else push("simple");
   }
@@ -761,6 +789,7 @@
   }
 
   function addAcceptedPhoto(selected, item, quality, message) {
+    if (state.photos.length === 0) trackFunnel("first_photo_added");
     state.photos.push({ file: selected, kind: item[0], label: item[1] });
     showQuality(quality, "ok", message, [
       {
@@ -899,6 +928,7 @@
         kind: `photo_${i + 1}`,
         label: "Foto",
       }));
+      if (files.length) trackFunnel("first_photo_added");
       state.data.maker = maker.value.trim();
       state.data.story = story.value.trim();
       push("contact");
@@ -939,6 +969,7 @@
   }
 
   function contactScreen() {
+    trackFunnel("contact_reached");
     const initialGuided = isInitialGuidedRequest();
     setProgress(initialGuided ? 44 : 88, "Kontaktdaten und Zustimmung");
     back.hidden = initialGuided;
@@ -985,6 +1016,7 @@
   }
 
   function markInitialLeadSaved(result) {
+    trackFunnel("lead_saved");
     state.leadId = String(result.id || "").slice(0, 160);
     state.continuationToken = result.continuation_token
       ? String(result.continuation_token).slice(0, 512)
@@ -1074,6 +1106,7 @@
       if (!result?.id) throw new Error("missing_id");
       state.leadId = String(result.id).slice(0, 160);
       if (["pending", "partial"].includes(result.processing_status)) {
+        trackFunnel("lead_submit_error");
         showQuality(
           status,
           "retry",
@@ -1084,8 +1117,12 @@
         return;
       }
       if (initialGuided) markInitialLeadSaved(result);
-      else finish();
+      else {
+        trackFunnel("lead_saved");
+        finish();
+      }
     } catch (_) {
+      trackFunnel("lead_submit_error");
       showQuality(
         status,
         "retry",
@@ -1157,6 +1194,7 @@
       if (!res.ok) throw new Error();
       const result = await res.json().catch(() => ({}));
       if (["pending", "partial"].includes(result.processing_status)) {
+        trackFunnel("continuation_submit_error");
         showQuality(
           status,
           "retry",
@@ -1169,8 +1207,10 @@
       }
       state.continuationRequestKey = null;
       state.uploadedPhotoCount = state.photos.length;
+      if (pendingPhotos.length) trackFunnel("additional_photo_uploaded");
       finish();
     } catch (_) {
+      trackFunnel("continuation_submit_error");
       showQuality(
         status,
         "retry",
@@ -1201,6 +1241,7 @@
     const continueButton = stage.querySelector("[data-continue]");
     if (continueButton)
       continueButton.onclick = () => {
+        trackFunnel("additional_photos_started");
         state.history.push({ step: "saved", photoIndex: state.photoIndex });
         state.step = hasMorePhotoSteps ? "photos" : "details";
         shouldFocusStage = true;
@@ -1241,6 +1282,11 @@
   if (!restored && state.type) {
     state.step = isAIType(state.type) ? "photos" : "simple";
     state.history = [{ step: "type", photoIndex: 0 }];
+  }
+  if (restored) trackFunnel("additional_photos_started");
+  else {
+    trackFunnel("wizard_opened", null);
+    if (state.type) trackFunnel("type_selected", state.type);
   }
   window.addEventListener("pagehide", releaseObjectUrls);
   render();

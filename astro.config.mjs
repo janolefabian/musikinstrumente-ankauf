@@ -4,6 +4,7 @@ import sitemap from "@astrojs/sitemap";
 const sitemapExcludedPaths = new Set([
   "/datenschutz/",
   "/impressum/",
+  "/admin/",
   "/review/",
 ]);
 

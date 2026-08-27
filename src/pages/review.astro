@@ -16,6 +16,42 @@ const apiBase = import.meta.env.PUBLIC_API_BASE || '';
       </div>
     </header>
 
+    <section class="review-funnel" data-funnel-panel hidden aria-labelledby="review-funnel-title">
+      <div class="review-funnel-header">
+        <div>
+          <p class="eyebrow">Anfrage-Funnel</p>
+          <h2 id="review-funnel-title">Wo steigen Besucher aus?</h2>
+          <p class="review-funnel-period" data-funnel-period></p>
+        </div>
+        <div class="review-funnel-controls">
+          <label>
+            <span>Instrument</span>
+            <select data-funnel-type>
+              <option value="all">Alle Instrumente</option>
+            </select>
+          </label>
+          <div class="review-funnel-ranges" aria-label="Auswertungszeitraum">
+            <button type="button" data-funnel-days="7">7 Tage</button>
+            <button type="button" class="active" data-funnel-days="30">30 Tage</button>
+            <button type="button" data-funnel-days="90">90 Tage</button>
+          </div>
+        </div>
+      </div>
+      <div class="review-funnel-summary" data-funnel-summary aria-live="polite"></div>
+      <div class="review-funnel-steps" data-funnel-steps></div>
+      <div class="review-funnel-secondary">
+        <section>
+          <h3>Foto-Nutzung</h3>
+          <div class="review-funnel-metrics" data-funnel-photos></div>
+        </section>
+        <section>
+          <h3>Technische Probleme</h3>
+          <div class="review-funnel-metrics" data-funnel-errors></div>
+        </section>
+      </div>
+      <p class="review-funnel-note">Cookie-freie, aggregierte Zählung. Es werden keine Personen oder einzelnen Sitzungen gespeichert; ein erneuter Seitenaufruf kann deshalb erneut zählen.</p>
+    </section>
+
     <div class="review-filter-groups">
       <div class="review-filter-group">
         <span class="review-filter-label">Priorität</span>
@@ -89,5 +125,5 @@ const apiBase = import.meta.env.PUBLIC_API_BASE || '';
       </section>
     </div>
   </section>
-  <script src="/js/review.js?v=20260825-2" is:inline></script>
+  <script src="/js/review.js?v=20260827-1" is:inline></script>
 </BaseLayout>

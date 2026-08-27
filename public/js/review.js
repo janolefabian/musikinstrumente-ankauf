@@ -12,6 +12,13 @@
   const selectionCountEl = root.querySelector("[data-selection-count]");
   const bulkArchiveEl = root.querySelector("[data-bulk-archive]");
   const bulkDeleteEl = root.querySelector("[data-bulk-delete]");
+  const funnelPanelEl = root.querySelector("[data-funnel-panel]");
+  const funnelPeriodEl = root.querySelector("[data-funnel-period]");
+  const funnelSummaryEl = root.querySelector("[data-funnel-summary]");
+  const funnelStepsEl = root.querySelector("[data-funnel-steps]");
+  const funnelPhotosEl = root.querySelector("[data-funnel-photos]");
+  const funnelErrorsEl = root.querySelector("[data-funnel-errors]");
+  const funnelTypeEl = root.querySelector("[data-funnel-type]");
   const lightbox = root.querySelector("[data-lightbox]");
   const actionDialogEl = root.querySelector("[data-action-dialog]");
   const actionDialogEyebrowEl = root.querySelector(
@@ -103,6 +110,11 @@
   let searchTimer = 0;
   let actionDialogResolver = null;
   let actionDialogPreviousFocus = null;
+  let funnelPayload = null;
+  let funnelDays = 30;
+  let funnelLoadedDays = null;
+  let funnelLoading = false;
+  let funnelRequestSequence = 0;
   const imageCache = new Map();
   const objectUrls = new Set();
   const imageQueue = [];
@@ -116,6 +128,27 @@
     "declined",
     "archived",
   ]);
+  const funnelLabels = {
+    wizard_opened: "Funnel geöffnet",
+    type_selected: "Instrument gewählt",
+    contact_reached: "Kontaktformular erreicht",
+    lead_saved: "Anfrage gespeichert",
+    flow_completed: "Vorgang abgeschlossen",
+    first_photo_added: "Erstes Foto hinzugefügt",
+    additional_photos_started: "Weitere Fotos begonnen",
+    additional_photo_uploaded: "Weitere Fotos übertragen",
+    lead_submit_error: "Fehler beim Speichern",
+    continuation_submit_error: "Fehler bei weiteren Fotos",
+  };
+  const funnelTypeLabels = {
+    double_bass: "Kontrabass",
+    bow: "Bogen",
+    strings: "Geige / Bratsche / Cello",
+    guitar: "Gitarre",
+    estate: "Mehrere Instrumente / Nachlass",
+    unknown: "Nicht eingeordnet",
+    other: "Anderes Instrument / Zubehör",
+  };
 
   const esc = (s) =>
     String(s ?? "").replace(
@@ -227,6 +260,135 @@
     });
   }
 
+  function funnelCount(counts, event) {
+    return Math.max(0, Number(counts?.[event] || 0));
+  }
+
+  function renderFunnel() {
+    if (!funnelPayload) return;
+    const selectedType = funnelTypeEl.value;
+    const counts =
+      selectedType === "all"
+        ? funnelPayload.totals || {}
+        : funnelPayload.by_type?.[selectedType] || {};
+    const stepEvents = (funnelPayload.events?.steps || []).filter(
+      (event) => selectedType === "all" || event !== "wizard_opened",
+    );
+    const startCount = funnelCount(counts, stepEvents[0]);
+    const savedCount = funnelCount(counts, "lead_saved");
+    const conversion = startCount
+      ? Math.round((savedCount / startCount) * 100)
+      : 0;
+    const period = funnelPayload.range || {};
+    const formatDay = (value) =>
+      value
+        ? new Date(`${value}T00:00:00Z`).toLocaleDateString("de-DE")
+        : "";
+    funnelPeriodEl.textContent = `${formatDay(period.from)} bis ${formatDay(period.to)}`;
+    funnelSummaryEl.innerHTML = startCount
+      ? `<strong>${conversion} %</strong><span>vom Start bis zur gespeicherten Anfrage</span>`
+      : "<span>Noch keine Funnel-Daten in diesem Zeitraum.</span>";
+
+    const scale = Math.max(
+      1,
+      ...stepEvents.map((event) => funnelCount(counts, event)),
+    );
+    funnelStepsEl.innerHTML = stepEvents
+      .map((event, index) => {
+        const count = funnelCount(counts, event);
+        const previous = index
+          ? funnelCount(counts, stepEvents[index - 1])
+          : count;
+        const fromStart = startCount
+          ? Math.round((count / startCount) * 100)
+          : 0;
+        const change = previous - count;
+        const comparison = index === 0
+          ? "Ausgangspunkt"
+          : change >= 0
+            ? `${change} weniger als davor`
+            : `${Math.abs(change)} mehr als davor`;
+        const width = count ? Math.max(3, Math.round((count / scale) * 100)) : 0;
+        return `<div class="review-funnel-step">
+          <div class="review-funnel-step-head"><strong>${funnelLabels[event] || event}</strong><span>${count}</span></div>
+          <div class="review-funnel-track" aria-hidden="true"><span style="width:${width}%"></span></div>
+          <small>${fromStart} % vom Start · ${comparison}</small>
+        </div>`;
+      })
+      .join("");
+
+    const metricMarkup = (events) =>
+      events
+        .map(
+          (event) => `<div><strong>${funnelCount(counts, event)}</strong><span>${funnelLabels[event] || event}</span></div>`,
+        )
+        .join("");
+    funnelPhotosEl.innerHTML = metricMarkup(
+      funnelPayload.events?.photos || [],
+    );
+    funnelErrorsEl.innerHTML = metricMarkup(
+      funnelPayload.events?.diagnostics || [],
+    );
+  }
+
+  function populateFunnelTypes() {
+    const selected = funnelTypeEl.value;
+    const available = Object.keys(funnelTypeLabels).filter((type) =>
+      Object.values(funnelPayload?.by_type?.[type] || {}).some(
+        (value) => Number(value) > 0,
+      ),
+    );
+    funnelTypeEl.innerHTML = [
+      '<option value="all">Alle Instrumente</option>',
+      ...available.map(
+        (type) => `<option value="${type}">${funnelTypeLabels[type]}</option>`,
+      ),
+    ].join("");
+    funnelTypeEl.value = available.includes(selected) ? selected : "all";
+  }
+
+  async function loadFunnel({ force = false } = {}) {
+    if (!api || !token) return;
+    if (!force && funnelLoadedDays === funnelDays && funnelPayload) {
+      funnelPanelEl.hidden = false;
+      renderFunnel();
+      return;
+    }
+    const requestedDays = funnelDays;
+    const sequence = ++funnelRequestSequence;
+    funnelLoading = true;
+    funnelPanelEl.hidden = false;
+    funnelSummaryEl.innerHTML = "<span>Funnel wird geladen …</span>";
+    try {
+      const response = await apiFetch(
+        `${api}/api/review/funnel?days=${requestedDays}`,
+      );
+      if (!response.ok) {
+        const error = new Error(`HTTP ${response.status}`);
+        error.status = response.status;
+        throw error;
+      }
+      if (sequence !== funnelRequestSequence) return;
+      funnelPayload = await response.json();
+      funnelLoadedDays = requestedDays;
+      populateFunnelTypes();
+      renderFunnel();
+    } catch (error) {
+      if (sequence !== funnelRequestSequence) return;
+      if (error.status === 401) funnelPanelEl.hidden = true;
+      else {
+        console.error(error);
+        funnelSummaryEl.innerHTML =
+          '<span>Die Funnel-Auswertung konnte gerade nicht geladen werden.</span>';
+        funnelStepsEl.innerHTML = "";
+        funnelPhotosEl.innerHTML = "";
+        funnelErrorsEl.innerHTML = "";
+      }
+    } finally {
+      if (sequence === funnelRequestSequence) funnelLoading = false;
+    }
+  }
+
   function syncSelectionUI() {
     const loadedIds = leads.map((lead) => lead.id);
     const selectedLoaded = loadedIds.filter((id) => selectedLeadIds.has(id));
@@ -317,6 +479,9 @@
     resultCountEl.textContent = "Geschützt";
     bulkBarEl.hidden = true;
     loadMoreEl.hidden = true;
+    funnelPanelEl.hidden = true;
+    funnelPayload = null;
+    funnelLoadedDays = null;
     listEl.innerHTML = `
       <div class="review-auth-state">
         <p class="eyebrow">Interner Bereich</p>
@@ -568,6 +733,7 @@
         Array.isArray(payload) ? countsFor(leads) : payload.counts || {},
       );
       renderList();
+      if (reset) void loadFunnel();
     } catch (error) {
       if (sequence !== requestSequence) return;
       // A missing or expired review key is an expected login state, not a
@@ -924,6 +1090,16 @@
   };
   bulkArchiveEl.onclick = () => runBulkAction("archive");
   bulkDeleteEl.onclick = () => runBulkAction("delete");
+  funnelTypeEl.onchange = renderFunnel;
+  root.querySelectorAll("[data-funnel-days]").forEach((button) => {
+    button.onclick = () => {
+      funnelDays = Number(button.dataset.funnelDays);
+      root.querySelectorAll("[data-funnel-days]").forEach((item) => {
+        item.classList.toggle("active", item === button);
+      });
+      void loadFunnel({ force: true });
+    };
+  });
   root.querySelectorAll("[data-action-dialog-cancel]").forEach((element) => {
     element.onclick = () => closeActionDialog(false);
   });

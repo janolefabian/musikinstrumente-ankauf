@@ -78,6 +78,16 @@ CREATE TABLE IF NOT EXISTS lead_continuations (
   PRIMARY KEY (lead_id, idempotency_key_hash)
 );
 
+CREATE TABLE IF NOT EXISTS funnel_daily (
+  event_date TEXT NOT NULL,
+  event_name TEXT NOT NULL,
+  instrument_type TEXT NOT NULL DEFAULT 'unselected',
+  device_type TEXT NOT NULL DEFAULT 'unknown',
+  event_count INTEGER NOT NULL DEFAULT 0 CHECK (event_count >= 0),
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (event_date, event_name, instrument_type, device_type)
+);
+
 CREATE INDEX IF NOT EXISTS idx_leads_created ON leads(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_leads_class ON leads(lead_class, notable, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status, created_at DESC);
@@ -97,3 +107,5 @@ CREATE INDEX IF NOT EXISTS idx_object_deletions_retry
   ON object_deletions(completed_at, next_attempt_at, lead_id);
 CREATE INDEX IF NOT EXISTS idx_lead_continuations_status
   ON lead_continuations(status, updated_at);
+CREATE INDEX IF NOT EXISTS idx_funnel_daily_event
+  ON funnel_daily(event_name, event_date);

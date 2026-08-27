@@ -128,3 +128,34 @@ test("photo-check accepts only a normal 200 response with an explicit boolean de
   assert.match(checkSource, /\["pending",\s*"partial"\]\.includes/);
   assert.match(checkSource, /throw new Error\("quality_invalid_response"\)/);
 });
+
+test("funnel analytics is aggregate, cookie-free and non-blocking", async () => {
+  const source = await readFile(wizardPath, "utf8");
+  const start = source.indexOf("function trackFunnel");
+  const end = source.indexOf("\n  function isAIType", start);
+  assert.ok(start >= 0 && end > start, "trackFunnel is missing");
+  const trackingSource = source.slice(start, end);
+  assert.match(trackingSource, /\/api\/funnel/);
+  assert.match(trackingSource, /keepalive:\s*true/);
+  assert.match(trackingSource, /trackedFunnelEvents\.has/);
+  assert.doesNotMatch(trackingSource, /(?:localStorage|sessionStorage|document\.cookie)/);
+  for (const event of [
+    "wizard_opened",
+    "type_selected",
+    "first_photo_added",
+    "contact_reached",
+    "lead_saved",
+    "additional_photos_started",
+    "additional_photo_uploaded",
+    "flow_completed",
+  ]) {
+    assert.match(source, new RegExp(`trackFunnel\\(\\"${event}\\"`));
+  }
+});
+
+test("review dashboard loads the protected funnel report", async () => {
+  const source = await readFile(reviewPath, "utf8");
+  assert.match(source, /\/api\/review\/funnel\?days=/);
+  assert.match(source, /data-funnel-steps/);
+  assert.match(source, /vom Start bis zur gespeicherten Anfrage/);
+});

@@ -99,10 +99,32 @@ function continuationRequest({ leadId, token, key, files = [], data = {} }) {
   );
 }
 
+function funnelRequest({
+  event = "wizard_opened",
+  instrumentType = "double_bass",
+  deviceType = "mobile",
+  origin = allowedOrigin,
+} = {}) {
+  return new Request("https://api.example.test/api/funnel", {
+    method: "POST",
+    headers: {
+      Origin: origin,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      event,
+      instrument_type: instrumentType,
+      device_type: deviceType,
+      email: "must-not-be-stored@example.invalid",
+    }),
+  });
+}
+
 test("review and photo endpoints fail closed without the exact token", async () => {
   const env = environment();
   const cases = [
     ["GET", "/api/review"],
+    ["GET", "/api/review/funnel"],
     ["POST", "/api/review/bulk"],
     ["GET", "/api/review/lead-1"],
     ["PATCH", "/api/review/lead-1"],
@@ -123,6 +145,74 @@ test("review and photo endpoints fail closed without the exact token", async () 
         assert.equal(response.status, 401, `${method} ${pathname} must be denied`);
       }
     }
+  } finally {
+    env.LEADS.close();
+  }
+});
+
+test("funnel tracking stores only validated aggregate counters", async () => {
+  const env = environment();
+  try {
+    for (const request of [
+      funnelRequest(),
+      funnelRequest(),
+      funnelRequest({ event: "contact_reached" }),
+    ]) {
+      const response = await worker.fetch(request, env, context());
+      assert.equal(response.status, 202);
+    }
+
+    const invalid = await worker.fetch(
+      funnelRequest({ event: "arbitrary_event" }),
+      env,
+      context(),
+    );
+    assert.equal(invalid.status, 400);
+    assert.equal((await invalid.json()).error, "funnel_event_invalid");
+
+    const foreignOrigin = await worker.fetch(
+      funnelRequest({ origin: "https://attacker.invalid" }),
+      env,
+      context(),
+    );
+    assert.equal(foreignOrigin.status, 403);
+
+    const rows = env.LEADS.database
+      .prepare(
+        `SELECT event_name,instrument_type,device_type,event_count
+         FROM funnel_daily ORDER BY event_name`,
+      )
+      .all()
+      .map((row) => ({ ...row }));
+    assert.deepEqual(rows, [
+      {
+        event_name: "contact_reached",
+        instrument_type: "double_bass",
+        device_type: "mobile",
+        event_count: 1,
+      },
+      {
+        event_name: "wizard_opened",
+        instrument_type: "double_bass",
+        device_type: "mobile",
+        event_count: 2,
+      },
+    ]);
+
+    const report = await worker.fetch(
+      new Request("https://api.example.test/api/review/funnel?days=7", {
+        headers: { Authorization: `Bearer ${env.REVIEW_TOKEN}` },
+      }),
+      env,
+      context(),
+    );
+    assert.equal(report.status, 200);
+    const payload = await report.json();
+    assert.equal(payload.range.days, 7);
+    assert.equal(payload.totals.wizard_opened, 2);
+    assert.equal(payload.totals.contact_reached, 1);
+    assert.equal(payload.by_type.double_bass.wizard_opened, 2);
+    assert.equal(JSON.stringify(payload).includes("must-not-be-stored"), false);
   } finally {
     env.LEADS.close();
   }

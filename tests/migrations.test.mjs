@@ -275,6 +275,7 @@ test("final defaults, required fields, uniqueness and named indexes are explicit
     const snapshot = schemaSnapshot(database);
     assert.deepEqual(snapshot.tables, [
       "api_rate_limits",
+      "funnel_daily",
       "lead_continuations",
       "leads",
       "object_deletions",
@@ -283,6 +284,7 @@ test("final defaults, required fields, uniqueness and named indexes are explicit
     assert.deepEqual(
       snapshot.indexes.map(({ name }) => name),
       [
+        "idx_funnel_daily_event",
         "idx_lead_continuations_status",
         "idx_leads_class",
         "idx_leads_created",
@@ -306,6 +308,9 @@ test("final defaults, required fields, uniqueness and named indexes are explicit
     );
     assert.deepEqual(defaults, {
       "api_rate_limits.count": "0",
+      "funnel_daily.device_type": "'unknown'",
+      "funnel_daily.event_count": "0",
+      "funnel_daily.instrument_type": "'unselected'",
       "lead_continuations.last_error": "''",
       "lead_continuations.status": "'pending'",
       "leads.confidence": "0",

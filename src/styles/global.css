@@ -1545,6 +1545,168 @@ select {
     sans-serif;
   color: var(--muted);
 }
+.review-funnel[hidden] {
+  display: none;
+}
+.review-funnel {
+  margin: 0 0 18px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+.review-funnel-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 22px;
+}
+.review-funnel-header .eyebrow {
+  margin-bottom: 4px;
+}
+.review-funnel-header h2 {
+  margin: 0;
+  font-size: clamp(25px, 3vw, 36px);
+}
+.review-funnel-period {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font: 12px Arial, sans-serif;
+}
+.review-funnel-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  font: 12px Arial, sans-serif;
+}
+.review-funnel-controls label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+}
+.review-funnel-controls select,
+.review-funnel-ranges button {
+  min-height: 36px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  font: 12px Arial, sans-serif;
+}
+.review-funnel-controls select {
+  max-width: 240px;
+  border-radius: 6px;
+  padding: 0 30px 0 10px;
+}
+.review-funnel-ranges {
+  display: flex;
+}
+.review-funnel-ranges button {
+  padding: 0 10px;
+  cursor: pointer;
+}
+.review-funnel-ranges button:first-child {
+  border-radius: 6px 0 0 6px;
+}
+.review-funnel-ranges button:last-child {
+  border-radius: 0 6px 6px 0;
+}
+.review-funnel-ranges button + button {
+  margin-left: -1px;
+}
+.review-funnel-ranges button.active {
+  position: relative;
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+.review-funnel-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 32px;
+  margin: 18px 0 12px;
+  font: 13px Arial, sans-serif;
+  color: var(--muted);
+}
+.review-funnel-summary strong {
+  color: var(--accent);
+  font-size: 28px;
+}
+.review-funnel-steps {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+.review-funnel-step {
+  min-width: 0;
+}
+.review-funnel-step-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 34px;
+  font: 12px Arial, sans-serif;
+}
+.review-funnel-step-head strong {
+  line-height: 1.25;
+}
+.review-funnel-step-head span {
+  font-size: 17px;
+  color: var(--accent);
+}
+.review-funnel-track {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e9e7e0;
+}
+.review-funnel-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+.review-funnel-step small {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font: 10px/1.35 Arial, sans-serif;
+}
+.review-funnel-secondary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.review-funnel-secondary h3 {
+  margin: 0 0 9px;
+  font: 700 12px Arial, sans-serif;
+}
+.review-funnel-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.review-funnel-metrics > div {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 7px 9px;
+  border-radius: 5px;
+  background: #f5f4ef;
+  font: 11px Arial, sans-serif;
+}
+.review-funnel-metrics strong {
+  color: var(--accent);
+  font-size: 16px;
+}
+.review-funnel-note {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font: 10px/1.45 Arial, sans-serif;
+}
 .review-filter-groups {
   display: grid;
   gap: 8px;
@@ -2140,6 +2302,9 @@ kbd {
   overflow: hidden;
 }
 @media (max-width: 1050px) {
+  .review-funnel-steps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
   .review-workspace {
     grid-template-columns: 330px minmax(0, 1fr);
   }
@@ -2182,6 +2347,25 @@ kbd {
   }
   .review-result-count {
     display: none;
+  }
+  .review-funnel {
+    padding: 16px;
+  }
+  .review-funnel-header,
+  .review-funnel-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .review-funnel-controls select {
+    width: 100%;
+    max-width: none;
+  }
+  .review-funnel-ranges button {
+    flex: 1;
+  }
+  .review-funnel-steps,
+  .review-funnel-secondary {
+    grid-template-columns: 1fr;
   }
   .review-filter-group {
     grid-template-columns: 1fr;

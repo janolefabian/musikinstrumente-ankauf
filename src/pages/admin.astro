@@ -1,0 +1,24 @@
+---
+const reviewPath = '/review/';
+---
+
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="robots" content="noindex,nofollow" />
+    <meta http-equiv="refresh" content={`0; url=${reviewPath}`} />
+    <link rel="canonical" href="https://musikinstrument-ankauf.de/review/" />
+    <title>Interner Bereich – Musikinstrument Ankauf</title>
+    <script is:inline define:vars={{ reviewPath }}>
+      window.location.replace(`${reviewPath}${window.location.search}${window.location.hash}`);
+    </script>
+  </head>
+  <body>
+    <main>
+      <p>Der interne Bereich wird geöffnet.</p>
+      <p><a href={reviewPath}>Dashboard öffnen</a></p>
+    </main>
+  </body>
+</html>

@@ -3,8 +3,14 @@ import { PHOTO_PROMPT, LEAD_PROMPT } from "./prompt.js";
 const DEFAULT_ALLOWED_ORIGINS = [
   "http://localhost:4321",
   "http://localhost:4322",
+  "http://localhost:4323",
+  "http://localhost:4324",
+  "http://localhost:4326",
   "http://127.0.0.1:4321",
   "http://127.0.0.1:4322",
+  "http://127.0.0.1:4323",
+  "http://127.0.0.1:4324",
+  "http://127.0.0.1:4326",
   "https://janolefabian.github.io",
   "https://musikinstrument-ankauf.de",
   "https://www.musikinstrument-ankauf.de",
@@ -59,6 +65,38 @@ const DETECTED_INSTRUMENT_TYPES = [
   "uncertain",
 ];
 const DETECTED_INSTRUMENT_TYPE_SET = new Set(DETECTED_INSTRUMENT_TYPES);
+const FUNNEL_STEP_EVENTS = [
+  "wizard_opened",
+  "type_selected",
+  "contact_reached",
+  "lead_saved",
+  "flow_completed",
+];
+const FUNNEL_PHOTO_EVENTS = [
+  "first_photo_added",
+  "additional_photos_started",
+  "additional_photo_uploaded",
+];
+const FUNNEL_DIAGNOSTIC_EVENTS = [
+  "lead_submit_error",
+  "continuation_submit_error",
+];
+const FUNNEL_EVENTS = new Set([
+  ...FUNNEL_STEP_EVENTS,
+  ...FUNNEL_PHOTO_EVENTS,
+  ...FUNNEL_DIAGNOSTIC_EVENTS,
+]);
+const FUNNEL_INSTRUMENT_TYPES = new Set([
+  ...ALLOWED_INSTRUMENT_TYPES,
+  "unselected",
+]);
+const FUNNEL_DEVICE_TYPES = new Set([
+  "mobile",
+  "tablet",
+  "desktop",
+  "unknown",
+]);
+const FUNNEL_RETENTION_DAYS = 400;
 
 class ApiError extends Error {
   constructor(status, code, headers = {}) {
@@ -1778,6 +1816,111 @@ function reviewAuthError(request, env) {
   return json({ error: "unauthorized" }, 401, request, env);
 }
 
+async function recordFunnelEvent(request, env) {
+  requirePublicWriteOrigin(request, env);
+  assertContentLength(request, 2048);
+  await enforceRateLimit(request, env, "funnel", 120, 10 * 60);
+  const contentType = request.headers.get("Content-Type") || "";
+  if (!contentType.toLowerCase().startsWith("application/json"))
+    apiError(415, "json_required");
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body !== "object" || Array.isArray(body))
+    apiError(400, "funnel_event_invalid");
+  const event = boundedText(body.event, 60, "funnel_event", {
+    required: true,
+  });
+  const instrumentType = boundedText(
+    body.instrument_type || "unselected",
+    40,
+    "funnel_instrument_type",
+  );
+  const deviceType = boundedText(
+    body.device_type || "unknown",
+    20,
+    "funnel_device_type",
+  );
+  if (!FUNNEL_EVENTS.has(event)) apiError(400, "funnel_event_invalid");
+  if (!FUNNEL_INSTRUMENT_TYPES.has(instrumentType))
+    apiError(400, "funnel_instrument_type_invalid");
+  if (!FUNNEL_DEVICE_TYPES.has(deviceType))
+    apiError(400, "funnel_device_type_invalid");
+
+  const now = new Date();
+  const updatedAt = now.toISOString();
+  await env.LEADS.prepare(
+    `INSERT INTO funnel_daily
+      (event_date,event_name,instrument_type,device_type,event_count,updated_at)
+     VALUES (?,?,?,?,1,?)
+     ON CONFLICT(event_date,event_name,instrument_type,device_type)
+     DO UPDATE SET
+       event_count=funnel_daily.event_count+1,
+       updated_at=excluded.updated_at`,
+  )
+    .bind(
+      updatedAt.slice(0, 10),
+      event,
+      instrumentType,
+      deviceType,
+      updatedAt,
+    )
+    .run();
+  return json({ ok: true }, 202, request, env);
+}
+
+function emptyFunnelCounts() {
+  return Object.fromEntries([...FUNNEL_EVENTS].map((event) => [event, 0]));
+}
+
+async function reviewFunnel(request, env) {
+  if (!authorized(request, env)) return reviewAuthError(request, env);
+  const url = new URL(request.url);
+  const requestedDays = Number(url.searchParams.get("days") || 30);
+  const days = [7, 30, 90].includes(requestedDays) ? requestedDays : 30;
+  const end = new Date();
+  const start = new Date(end);
+  start.setUTCDate(start.getUTCDate() - (days - 1));
+  const from = start.toISOString().slice(0, 10);
+  const to = end.toISOString().slice(0, 10);
+  const { results = [] } = await env.LEADS.prepare(
+    `SELECT event_name,instrument_type,device_type,SUM(event_count) AS count
+     FROM funnel_daily
+     WHERE event_date>=? AND event_date<=?
+     GROUP BY event_name,instrument_type,device_type`,
+  )
+    .bind(from, to)
+    .all();
+
+  const totals = emptyFunnelCounts();
+  const byType = {};
+  const byDevice = {};
+  for (const row of results) {
+    if (!FUNNEL_EVENTS.has(row.event_name)) continue;
+    const count = Number(row.count || 0);
+    totals[row.event_name] += count;
+    byType[row.instrument_type] ||= emptyFunnelCounts();
+    byType[row.instrument_type][row.event_name] += count;
+    byDevice[row.device_type] ||= emptyFunnelCounts();
+    byDevice[row.device_type][row.event_name] += count;
+  }
+
+  return json(
+    {
+      range: { days, from, to },
+      events: {
+        steps: FUNNEL_STEP_EVENTS,
+        photos: FUNNEL_PHOTO_EVENTS,
+        diagnostics: FUNNEL_DIAGNOSTIC_EVENTS,
+      },
+      totals,
+      by_type: byType,
+      by_device: byDevice,
+    },
+    200,
+    request,
+    env,
+  );
+}
+
 function encodeReviewCursor(row) {
   return base64Url(
     new TextEncoder().encode(JSON.stringify([row.created_at, row.id])),
@@ -2257,6 +2400,11 @@ async function recoverStaleTombstoneUploads(env) {
 
 async function cleanupJournals(env) {
   const cutoff = new Date(Date.now() - JOURNAL_RETENTION_MS).toISOString();
+  const funnelCutoff = new Date(
+    Date.now() - FUNNEL_RETENTION_DAYS * 24 * 60 * 60 * 1000,
+  )
+    .toISOString()
+    .slice(0, 10);
   await env.LEADS.batch([
     env.LEADS.prepare(
       `DELETE FROM lead_continuations
@@ -2266,6 +2414,9 @@ async function cleanupJournals(env) {
       `DELETE FROM object_deletions
        WHERE completed_at IS NOT NULL AND completed_at<?`,
     ).bind(cutoff),
+    env.LEADS.prepare(
+      `DELETE FROM funnel_daily WHERE event_date<?`,
+    ).bind(funnelCutoff),
   ]);
 }
 
@@ -2573,6 +2724,8 @@ export default {
         return json({ ok: true }, 200, request, env);
       if (url.pathname === "/api/photo-check" && request.method === "POST")
         return await photoCheck(request, env);
+      if (url.pathname === "/api/funnel" && request.method === "POST")
+        return await recordFunnelEvent(request, env);
       if (url.pathname === "/api/leads" && request.method === "POST")
         return await createLead(request, env, ctx);
       const continuation = url.pathname.match(/^\/api\/leads\/([^/]+)\/continue$/);
@@ -2584,6 +2737,8 @@ export default {
         );
       if (url.pathname === "/api/review" && request.method === "GET")
         return await reviewList(request, env);
+      if (url.pathname === "/api/review/funnel" && request.method === "GET")
+        return await reviewFunnel(request, env);
       if (url.pathname === "/api/review/bulk" && request.method === "POST")
         return await bulkReviewAction(request, env);
       const thumbnail = url.pathname.match(
