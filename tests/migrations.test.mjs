@@ -281,6 +281,9 @@ test("final defaults, required fields, uniqueness and named indexes are explicit
       "leads",
       "object_deletions",
       "photos",
+      "site_pageviews_daily",
+      "site_visitor_uniques",
+      "site_visitors_daily",
     ]);
     assert.deepEqual(
       snapshot.indexes.map(({ name }) => name),
@@ -298,6 +301,9 @@ test("final defaults, required fields, uniqueness and named indexes are explicit
         "idx_photos_operation",
         "idx_photos_storage",
         "idx_rate_limits_expires",
+        "idx_site_pageviews_date",
+        "idx_site_visitor_uniques_created",
+        "idx_site_visitors_date",
       ],
     );
 
@@ -332,6 +338,10 @@ test("final defaults, required fields, uniqueness and named indexes are explicit
       "object_deletions.last_error": "''",
       "photos.storage_error": "''",
       "photos.storage_status": "'ready'",
+      "site_pageviews_daily.country_code": "'XX'",
+      "site_pageviews_daily.view_count": "0",
+      "site_visitors_daily.country_code": "'XX'",
+      "site_visitors_daily.visitor_count": "0",
     });
 
     assert.throws(

@@ -1,0 +1,130 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const apiBase = import.meta.env.PUBLIC_API_BASE || '';
+---
+<BaseLayout title="Analyse – Musikinstrument Ankauf" robots="noindex,nofollow" analytics={false}>
+  <section class="review-page review-shell analysis-page" data-analysis data-api-base={apiBase}>
+    <section class="review-auth-gate" data-analysis-auth-gate aria-labelledby="analysis-auth-title">
+      <div class="review-auth-state">
+        <p class="eyebrow">Interner Bereich</p>
+        <h1 id="analysis-auth-title">Analyse entsperren</h1>
+        <p>Verwenden Sie denselben Zugangsschlüssel wie für die Anfragen.</p>
+        <form data-analysis-login>
+          <label for="analysis-access-token">Zugangsschlüssel</label>
+          <input id="analysis-access-token" type="password" autocomplete="current-password" required data-analysis-token />
+          <button type="submit" data-analysis-login-submit>Analyse öffnen</button>
+          <p class="review-auth-error" data-analysis-auth-error role="alert" aria-live="polite"></p>
+        </form>
+      </div>
+    </section>
+
+    <div class="review-dashboard analysis-dashboard" data-analysis-dashboard hidden>
+      <nav class="review-area-nav" aria-label="Interner Bereich">
+        <a href="/review/">Anfragen</a>
+        <a href="/review/analyse/" aria-current="page">Analyse</a>
+      </nav>
+
+      <header class="analysis-header">
+        <div>
+          <p class="eyebrow">Intern</p>
+          <h1>Analyse</h1>
+          <p data-analysis-period>Besucher und Anfrage-Funnel</p>
+        </div>
+        <div class="analysis-ranges" aria-label="Auswertungszeitraum">
+          <button type="button" data-analysis-days="7">7 Tage</button>
+          <button type="button" class="active" data-analysis-days="30">30 Tage</button>
+          <button type="button" data-analysis-days="90">90 Tage</button>
+          <button type="button" data-analysis-days="365">1 Jahr</button>
+        </div>
+      </header>
+
+      <p class="analysis-error" data-analysis-error role="alert" hidden></p>
+
+      <section aria-labelledby="analysis-overview-title">
+        <div class="analysis-section-heading">
+          <div>
+            <p class="eyebrow">Reichweite</p>
+            <h2 id="analysis-overview-title">Besucher im Überblick</h2>
+          </div>
+          <p>Täglich eindeutig gezählt, ohne Cookie oder dauerhaftes Nutzerprofil.</p>
+        </div>
+        <div class="analysis-kpis" data-analysis-kpis aria-live="polite"></div>
+        <div class="analysis-card analysis-timeline-card">
+          <div class="analysis-card-head">
+            <div>
+              <h3>Entwicklung</h3>
+              <p data-analysis-granularity>Tagesansicht</p>
+            </div>
+            <div class="analysis-legend" aria-label="Legende">
+              <span class="views">Seitenaufrufe</span>
+              <span class="visitors">Besucher</span>
+              <span class="leads">Anfragen</span>
+            </div>
+          </div>
+          <div class="analysis-timeline" data-analysis-timeline></div>
+        </div>
+      </section>
+
+      <div class="analysis-grid analysis-grid-primary">
+        <section class="analysis-card" aria-labelledby="analysis-pages-title">
+          <div class="analysis-card-head">
+            <div><h3 id="analysis-pages-title">Meistbesuchte Seiten</h3><p>Alle Seitenaufrufe</p></div>
+          </div>
+          <div class="analysis-list" data-analysis-pages></div>
+        </section>
+        <section class="analysis-card" aria-labelledby="analysis-entries-title">
+          <div class="analysis-card-head">
+            <div><h3 id="analysis-entries-title">Einstiegsseiten</h3><p>Erste Seite eines täglichen Besuchs</p></div>
+          </div>
+          <div class="analysis-list" data-analysis-entries></div>
+        </section>
+      </div>
+
+      <div class="analysis-grid analysis-grid-secondary">
+        <section class="analysis-card"><div class="analysis-card-head"><div><h3>Zugriffswege</h3><p>Google, direkt, intern oder andere Websites</p></div></div><div class="analysis-list" data-analysis-sources></div></section>
+        <section class="analysis-card"><div class="analysis-card-head"><div><h3>Geräte</h3><p>Smartphone, Tablet oder Computer</p></div></div><div class="analysis-list" data-analysis-devices></div></section>
+        <section class="analysis-card"><div class="analysis-card-head"><div><h3>Länder</h3><p>Grobe Herkunft laut Netzwerkstandort</p></div></div><div class="analysis-list" data-analysis-countries></div></section>
+        <section class="analysis-card"><div class="analysis-card-head"><div><h3>Seitenbereiche</h3><p>Welche Inhalte werden genutzt?</p></div></div><div class="analysis-list" data-analysis-groups></div></section>
+      </div>
+
+      <section class="analysis-card analysis-hours-card" aria-labelledby="analysis-hours-title">
+        <div class="analysis-card-head"><div><h3 id="analysis-hours-title">Besuche nach Tageszeit</h3><p>Seitenaufrufe nach Uhrzeit in Deutschland</p></div></div>
+        <div class="analysis-hours" data-analysis-hours></div>
+      </section>
+
+      <section class="review-funnel analysis-funnel" data-funnel-panel aria-labelledby="review-funnel-title">
+        <div class="review-funnel-header">
+          <div>
+            <p class="eyebrow">Anfrage-Funnel</p>
+            <h2 id="review-funnel-title">Wo steigen Besucher aus?</h2>
+            <p class="review-funnel-period" data-funnel-period></p>
+          </div>
+          <div class="review-funnel-controls">
+            <label>
+              <span>Instrument</span>
+              <select data-funnel-type><option value="all">Alle Instrumente</option></select>
+            </label>
+          </div>
+        </div>
+        <div class="review-funnel-summary" data-funnel-summary aria-live="polite"></div>
+        <div class="review-funnel-steps" data-funnel-steps></div>
+        <div class="review-funnel-secondary">
+          <section><h3>Foto-Nutzung</h3><div class="review-funnel-metrics" data-funnel-photos></div></section>
+          <section><h3>Technische Probleme</h3><div class="review-funnel-metrics" data-funnel-errors></div></section>
+        </div>
+        <div class="review-funnel-insights">
+          <section><h3>Nach Gerät</h3><p>Start bis gespeicherte Anfrage</p><div class="review-funnel-breakdown" data-funnel-devices></div></section>
+          <section><h3>Einstiegsseite</h3><p>Grob gruppiert, ohne vollständige Referrer-URL</p><div class="review-funnel-breakdown" data-funnel-entry></div></section>
+          <section><h3>Zugriffsweg</h3><p>Ohne Suchbegriffe oder externe URL</p><div class="review-funnel-breakdown" data-funnel-sources></div></section>
+        </div>
+        <section class="review-funnel-friction"><h3>Wo hakt es?</h3><div class="review-funnel-metrics" data-funnel-friction></div></section>
+      </section>
+
+      <aside class="analysis-privacy-note">
+        <strong>Datensparsame interne Messung</strong>
+        <p>Keine Analyse-Cookies, keine dauerhafte Besucher-ID und keine vollständigen Referrer oder Suchbegriffe. Derselbe Mensch kann an unterschiedlichen Tagen erneut zählen. Bots werden soweit erkennbar herausgefiltert.</p>
+      </aside>
+    </div>
+  </section>
+  <script src="/js/analysis.js?v=20260829-1" is:inline></script>
+</BaseLayout>

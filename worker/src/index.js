@@ -126,6 +126,48 @@ const FUNNEL_SOURCE_GROUPS = new Set([
   "unknown",
 ]);
 const FUNNEL_RETENTION_DAYS = 400;
+const ANALYTICS_UNIQUE_RETENTION_DAYS = 3;
+const ANALYTICS_CITY_PATHS = new Set([
+  "berlin",
+  "bremen",
+  "dortmund",
+  "dresden",
+  "duesseldorf",
+  "duisburg",
+  "essen",
+  "frankfurt",
+  "hamburg",
+  "hannover",
+  "koeln",
+  "leipzig",
+  "muenchen",
+  "nuernberg",
+  "stuttgart",
+]);
+const ANALYTICS_INSTRUMENT_PATHS = new Set([
+  "/bogen-verkaufen/",
+  "/cello-verkaufen/",
+  "/geige-verkaufen/",
+  "/instrument-geerbt/",
+  "/kontrabass-verkaufen/",
+  "/kontrabassbogen-verkaufen/",
+]);
+const ANALYTICS_STORY_PATHS = new Set([
+  "/instrumentengeschichten/",
+  "/instrumentengeschichten/albert-volkmann-1908/",
+  "/instrumentengeschichten/august-rau-geigenbogen-um-1910/",
+  "/instrumentengeschichten/f-guenter-hoyer-kontrabassbogen-um-1950/",
+  "/instrumentengeschichten/johannes-rubner-1967/",
+]);
+const ANALYTICS_SOURCE_GROUPS = new Set([
+  "direct",
+  "internal",
+  "google",
+  "bing",
+  "duckduckgo",
+  "external",
+  "unknown",
+]);
 
 class ApiError extends Error {
   constructor(status, code, headers = {}) {
@@ -1845,6 +1887,152 @@ function reviewAuthError(request, env) {
   return json({ error: "unauthorized" }, 401, request, env);
 }
 
+function analyticsPageGroup(path) {
+  if (path === "/") return "home";
+  if (path === "/instrument-verkaufen/") return "form";
+  if (ANALYTICS_INSTRUMENT_PATHS.has(path)) return "instrument";
+  if (ANALYTICS_STORY_PATHS.has(path)) return "story";
+  const city = path.match(/^\/([a-z0-9-]+)\/$/)?.[1];
+  if (city && ANALYTICS_CITY_PATHS.has(city)) return "city";
+  return null;
+}
+
+function isLikelyBot(request) {
+  if (request.cf?.botManagement?.verifiedBot) return true;
+  const userAgent = request.headers.get("User-Agent") || "";
+  return /bot|crawler|spider|slurp|headless|lighthouse|pagespeed|preview|facebookexternalhit|whatsapp|telegrambot|discordbot/i.test(
+    userAgent,
+  );
+}
+
+function berlinDateParts(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Berlin",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return {
+    date: `${values.year}-${values.month}-${values.day}`,
+    hour: Math.max(0, Math.min(23, Number(values.hour) || 0)),
+  };
+}
+
+async function analyticsVisitorHash(request, env, eventDate) {
+  const key = await continuationKey(env, ["sign"]);
+  if (!key) return null;
+  const forwarded = (request.headers.get("X-Forwarded-For") || "")
+    .split(",")[0]
+    .trim();
+  const client =
+    request.headers.get("CF-Connecting-IP") || forwarded || "unknown";
+  const userAgent = (request.headers.get("User-Agent") || "unknown").slice(0, 300);
+  const signature = new Uint8Array(
+    await crypto.subtle.sign(
+      "HMAC",
+      key,
+      new TextEncoder().encode(
+        `site-analytics-v1\n${eventDate}\n${client}\n${userAgent}`,
+      ),
+    ),
+  );
+  return base64Url(signature);
+}
+
+async function recordSitePageview(request, env) {
+  requirePublicWriteOrigin(request, env);
+  assertContentLength(request, 2048);
+  if (isLikelyBot(request)) return json({ ok: true }, 202, request, env);
+  await enforceRateLimit(request, env, "site-analytics", 180, 10 * 60);
+  const contentType = request.headers.get("Content-Type") || "";
+  if (!contentType.toLowerCase().startsWith("application/json"))
+    apiError(415, "json_required");
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body !== "object" || Array.isArray(body))
+    apiError(400, "analytics_event_invalid");
+  const pagePath = boundedText(body.page_path, 140, "analytics_page_path", {
+    required: true,
+  });
+  const pageGroup = analyticsPageGroup(pagePath);
+  if (!pageGroup) apiError(400, "analytics_page_invalid");
+  const sourceGroup = boundedText(
+    body.source_group || "unknown",
+    30,
+    "analytics_source_group",
+  );
+  const deviceType = boundedText(
+    body.device_type || "unknown",
+    20,
+    "analytics_device_type",
+  );
+  if (!ANALYTICS_SOURCE_GROUPS.has(sourceGroup))
+    apiError(400, "analytics_source_group_invalid");
+  if (!FUNNEL_DEVICE_TYPES.has(deviceType))
+    apiError(400, "analytics_device_type_invalid");
+
+  const now = new Date();
+  const updatedAt = now.toISOString();
+  const { date: eventDate, hour } = berlinDateParts(now);
+  const countryRaw = String(request.cf?.country || "XX").toUpperCase();
+  const countryCode = /^[A-Z]{2}$/.test(countryRaw) ? countryRaw : "XX";
+  const visitorHash = await analyticsVisitorHash(request, env, eventDate);
+  let firstVisit = false;
+  if (visitorHash) {
+    const unique = await env.LEADS.prepare(
+      `INSERT OR IGNORE INTO site_visitor_uniques
+        (event_date,visitor_hash,created_at) VALUES (?,?,?)`,
+    )
+      .bind(eventDate, visitorHash, updatedAt)
+      .run();
+    firstVisit = Number(unique?.meta?.changes || 0) > 0;
+  }
+
+  const statements = [
+    env.LEADS.prepare(
+      `INSERT INTO site_pageviews_daily
+        (event_date,hour_of_day,page_path,page_group,source_group,device_type,country_code,view_count,updated_at)
+       VALUES (?,?,?,?,?,?,?,1,?)
+       ON CONFLICT(event_date,hour_of_day,page_path,source_group,device_type,country_code)
+       DO UPDATE SET view_count=site_pageviews_daily.view_count+1,
+                     updated_at=excluded.updated_at`,
+    ).bind(
+      eventDate,
+      hour,
+      pagePath,
+      pageGroup,
+      sourceGroup,
+      deviceType,
+      countryCode,
+      updatedAt,
+    ),
+  ];
+  if (firstVisit) {
+    statements.push(
+      env.LEADS.prepare(
+        `INSERT INTO site_visitors_daily
+          (event_date,entry_path,entry_group,source_group,device_type,country_code,visitor_count,updated_at)
+         VALUES (?,?,?,?,?,?,1,?)
+         ON CONFLICT(event_date,entry_path,source_group,device_type,country_code)
+         DO UPDATE SET visitor_count=site_visitors_daily.visitor_count+1,
+                       updated_at=excluded.updated_at`,
+      ).bind(
+        eventDate,
+        pagePath,
+        pageGroup,
+        sourceGroup,
+        deviceType,
+        countryCode,
+        updatedAt,
+      ),
+    );
+  }
+  await env.LEADS.batch(statements);
+  return json({ ok: true }, 202, request, env);
+}
+
 async function recordFunnelEvent(request, env) {
   requirePublicWriteOrigin(request, env);
   assertContentLength(request, 2048);
@@ -1890,7 +2078,7 @@ async function recordFunnelEvent(request, env) {
 
   const now = new Date();
   const updatedAt = now.toISOString();
-  const eventDate = updatedAt.slice(0, 10);
+  const eventDate = berlinDateParts(now).date;
   const breakdownStatement = (name, value) =>
     env.LEADS.prepare(
       `INSERT INTO funnel_breakdowns_daily
@@ -1925,12 +2113,11 @@ async function reviewFunnel(request, env) {
   if (!authorized(request, env)) return reviewAuthError(request, env);
   const url = new URL(request.url);
   const requestedDays = Number(url.searchParams.get("days") || 30);
-  const days = [7, 30, 90].includes(requestedDays) ? requestedDays : 30;
-  const end = new Date();
-  const start = new Date(end);
+  const days = [7, 30, 90, 365].includes(requestedDays) ? requestedDays : 30;
+  const to = berlinDateParts().date;
+  const start = new Date(`${to}T12:00:00Z`);
   start.setUTCDate(start.getUTCDate() - (days - 1));
   const from = start.toISOString().slice(0, 10);
-  const to = end.toISOString().slice(0, 10);
   const { results = [] } = await env.LEADS.prepare(
     `SELECT event_name,instrument_type,device_type,SUM(event_count) AS count
      FROM funnel_daily
@@ -1998,6 +2185,193 @@ async function reviewFunnel(request, env) {
       by_device_type: byDeviceType,
       breakdowns,
       breakdowns_by_type: breakdownsByType,
+    },
+    200,
+    request,
+    env,
+  );
+}
+
+function mergeAnalyticsBreakdown(viewRows, visitorRows, keyName) {
+  const merged = new Map();
+  for (const row of viewRows) {
+    const key = String(row[keyName] || "unknown");
+    merged.set(key, {
+      key,
+      views: Number(row.count || 0),
+      visitors: 0,
+    });
+  }
+  for (const row of visitorRows) {
+    const key = String(row[keyName] || "unknown");
+    const item = merged.get(key) || { key, views: 0, visitors: 0 };
+    item.visitors += Number(row.count || 0);
+    merged.set(key, item);
+  }
+  return [...merged.values()].sort(
+    (a, b) => b.visitors - a.visitors || b.views - a.views,
+  );
+}
+
+async function reviewSiteAnalytics(request, env) {
+  if (!authorized(request, env)) return reviewAuthError(request, env);
+  const url = new URL(request.url);
+  const requestedDays = Number(url.searchParams.get("days") || 30);
+  const days = [7, 30, 90, 365].includes(requestedDays) ? requestedDays : 30;
+  const today = berlinDateParts().date;
+  const start = new Date(`${today}T12:00:00Z`);
+  start.setUTCDate(start.getUTCDate() - (days - 1));
+  const from = start.toISOString().slice(0, 10);
+  const to = today;
+
+  const query = (sql) => env.LEADS.prepare(sql).bind(from, to).all();
+  const [
+    viewsByDayResult,
+    visitorsByDayResult,
+    leadsByDayResult,
+    pagesResult,
+    entriesResult,
+    viewSourcesResult,
+    visitorSourcesResult,
+    viewDevicesResult,
+    visitorDevicesResult,
+    viewCountriesResult,
+    visitorCountriesResult,
+    hoursResult,
+    groupsResult,
+  ] = await Promise.all([
+    query(
+      `SELECT event_date,SUM(view_count) AS count
+       FROM site_pageviews_daily WHERE event_date>=? AND event_date<=?
+       GROUP BY event_date`,
+    ),
+    query(
+      `SELECT event_date,SUM(visitor_count) AS count
+       FROM site_visitors_daily WHERE event_date>=? AND event_date<=?
+       GROUP BY event_date`,
+    ),
+    query(
+      `SELECT event_date,SUM(event_count) AS count
+       FROM funnel_daily
+       WHERE event_date>=? AND event_date<=? AND event_name='lead_saved'
+       GROUP BY event_date`,
+    ),
+    query(
+      `SELECT page_path,page_group,SUM(view_count) AS views
+       FROM site_pageviews_daily WHERE event_date>=? AND event_date<=?
+       GROUP BY page_path,page_group ORDER BY views DESC LIMIT 20`,
+    ),
+    query(
+      `SELECT entry_path,entry_group,SUM(visitor_count) AS visitors
+       FROM site_visitors_daily WHERE event_date>=? AND event_date<=?
+       GROUP BY entry_path,entry_group ORDER BY visitors DESC LIMIT 20`,
+    ),
+    query(
+      `SELECT source_group,SUM(view_count) AS count
+       FROM site_pageviews_daily WHERE event_date>=? AND event_date<=?
+       GROUP BY source_group`,
+    ),
+    query(
+      `SELECT source_group,SUM(visitor_count) AS count
+       FROM site_visitors_daily WHERE event_date>=? AND event_date<=?
+       GROUP BY source_group`,
+    ),
+    query(
+      `SELECT device_type,SUM(view_count) AS count
+       FROM site_pageviews_daily WHERE event_date>=? AND event_date<=?
+       GROUP BY device_type`,
+    ),
+    query(
+      `SELECT device_type,SUM(visitor_count) AS count
+       FROM site_visitors_daily WHERE event_date>=? AND event_date<=?
+       GROUP BY device_type`,
+    ),
+    query(
+      `SELECT country_code,SUM(view_count) AS count
+       FROM site_pageviews_daily WHERE event_date>=? AND event_date<=?
+       GROUP BY country_code`,
+    ),
+    query(
+      `SELECT country_code,SUM(visitor_count) AS count
+       FROM site_visitors_daily WHERE event_date>=? AND event_date<=?
+       GROUP BY country_code`,
+    ),
+    query(
+      `SELECT hour_of_day,SUM(view_count) AS views
+       FROM site_pageviews_daily WHERE event_date>=? AND event_date<=?
+       GROUP BY hour_of_day ORDER BY hour_of_day`,
+    ),
+    query(
+      `SELECT page_group,SUM(view_count) AS views
+       FROM site_pageviews_daily WHERE event_date>=? AND event_date<=?
+       GROUP BY page_group ORDER BY views DESC`,
+    ),
+  ]);
+
+  const dateMap = new Map();
+  for (let offset = 0; offset < days; offset++) {
+    const date = new Date(`${from}T12:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + offset);
+    const key = date.toISOString().slice(0, 10);
+    dateMap.set(key, { date: key, views: 0, visitors: 0, leads: 0 });
+  }
+  for (const row of viewsByDayResult.results || [])
+    if (dateMap.has(row.event_date))
+      dateMap.get(row.event_date).views = Number(row.count || 0);
+  for (const row of visitorsByDayResult.results || [])
+    if (dateMap.has(row.event_date))
+      dateMap.get(row.event_date).visitors = Number(row.count || 0);
+  for (const row of leadsByDayResult.results || [])
+    if (dateMap.has(row.event_date))
+      dateMap.get(row.event_date).leads = Number(row.count || 0);
+  const timeline = [...dateMap.values()];
+  const totals = timeline.reduce(
+    (sum, row) => ({
+      views: sum.views + row.views,
+      visitors: sum.visitors + row.visitors,
+      leads: sum.leads + row.leads,
+    }),
+    { views: 0, visitors: 0, leads: 0 },
+  );
+
+  return json(
+    {
+      range: { days, from, to },
+      totals,
+      timeline,
+      pages: (pagesResult.results || []).map((row) => ({
+        path: row.page_path,
+        group: row.page_group,
+        views: Number(row.views || 0),
+      })),
+      entries: (entriesResult.results || []).map((row) => ({
+        path: row.entry_path,
+        group: row.entry_group,
+        visitors: Number(row.visitors || 0),
+      })),
+      sources: mergeAnalyticsBreakdown(
+        viewSourcesResult.results || [],
+        visitorSourcesResult.results || [],
+        "source_group",
+      ),
+      devices: mergeAnalyticsBreakdown(
+        viewDevicesResult.results || [],
+        visitorDevicesResult.results || [],
+        "device_type",
+      ),
+      countries: mergeAnalyticsBreakdown(
+        viewCountriesResult.results || [],
+        visitorCountriesResult.results || [],
+        "country_code",
+      ),
+      hours: (hoursResult.results || []).map((row) => ({
+        hour: Number(row.hour_of_day || 0),
+        views: Number(row.views || 0),
+      })),
+      page_groups: (groupsResult.results || []).map((row) => ({
+        key: row.page_group,
+        views: Number(row.views || 0),
+      })),
     },
     200,
     request,
@@ -2489,6 +2863,9 @@ async function cleanupJournals(env) {
   )
     .toISOString()
     .slice(0, 10);
+  const uniqueCutoff = new Date(
+    Date.now() - ANALYTICS_UNIQUE_RETENTION_DAYS * 24 * 60 * 60 * 1000,
+  ).toISOString();
   await env.LEADS.batch([
     env.LEADS.prepare(
       `DELETE FROM lead_continuations
@@ -2504,6 +2881,15 @@ async function cleanupJournals(env) {
     env.LEADS.prepare(
       `DELETE FROM funnel_breakdowns_daily WHERE event_date<?`,
     ).bind(funnelCutoff),
+    env.LEADS.prepare(
+      `DELETE FROM site_pageviews_daily WHERE event_date<?`,
+    ).bind(funnelCutoff),
+    env.LEADS.prepare(
+      `DELETE FROM site_visitors_daily WHERE event_date<?`,
+    ).bind(funnelCutoff),
+    env.LEADS.prepare(
+      `DELETE FROM site_visitor_uniques WHERE created_at<?`,
+    ).bind(uniqueCutoff),
   ]);
 }
 
@@ -2813,6 +3199,11 @@ export default {
         return await photoCheck(request, env);
       if (url.pathname === "/api/funnel" && request.method === "POST")
         return await recordFunnelEvent(request, env);
+      if (
+        url.pathname === "/api/analytics/pageview" &&
+        request.method === "POST"
+      )
+        return await recordSitePageview(request, env);
       if (url.pathname === "/api/leads" && request.method === "POST")
         return await createLead(request, env, ctx);
       const continuation = url.pathname.match(/^\/api\/leads\/([^/]+)\/continue$/);
@@ -2826,6 +3217,11 @@ export default {
         return await reviewList(request, env);
       if (url.pathname === "/api/review/funnel" && request.method === "GET")
         return await reviewFunnel(request, env);
+      if (
+        url.pathname === "/api/review/analytics" &&
+        request.method === "GET"
+      )
+        return await reviewSiteAnalytics(request, env);
       if (url.pathname === "/api/review/bulk" && request.method === "POST")
         return await bulkReviewAction(request, env);
       const thumbnail = url.pathname.match(

@@ -215,19 +215,6 @@
         return "duckduckgo";
       return "external";
     }
-    try {
-      const saved = JSON.parse(
-        sessionStorage.getItem("instrument-funnel-source-v1") || "null",
-      );
-      if (
-        saved &&
-        ["google", "bing", "duckduckgo", "external"].includes(saved.value) &&
-        Number(saved.expires_at) > Date.now()
-      )
-        return saved.value;
-    } catch (_) {
-      // A blocked sessionStorage leaves the anonymous source unknown.
-    }
     return referrer ? "internal" : "direct";
   }
   const funnelContext = {

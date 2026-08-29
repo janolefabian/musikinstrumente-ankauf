@@ -60,7 +60,7 @@ npm exec --workspace worker -- wrangler d1 execute LEADS --remote --command "SEL
 npm exec --workspace worker -- wrangler d1 migrations list LEADS --remote
 ```
 
-Jetzt dürfen nur `0003_worker_hardening.sql` und die anschließend hinzugekommenen additiven Migrationen `0004_funnel_analytics.sql` sowie `0005_funnel_insights.sql` ausstehen. Bei jedem anderen Ergebnis nicht `apply` starten: Export in eine getrennte Staging-Datenbank importieren und dort den tatsächlichen Zwischenstand untersuchen. Insbesondere darf eine fehlende Historie niemals durch erneutes Ausführen von `schema.sql` „repariert“ werden.
+Jetzt dürfen nur `0003_worker_hardening.sql` und die anschließend hinzugekommenen additiven Migrationen `0004_funnel_analytics.sql`, `0005_funnel_insights.sql` sowie `0006_private_site_analytics.sql` ausstehen. Bei jedem anderen Ergebnis nicht `apply` starten: Export in eine getrennte Staging-Datenbank importieren und dort den tatsächlichen Zwischenstand untersuchen. Insbesondere darf eine fehlende Historie niemals durch erneutes Ausführen von `schema.sql` „repariert“ werden.
 
 Sonderfall: Fehlt `thumbnail_key` noch, `0002` nicht als angewendet markieren. Nach gesichertem Test auf einer Datenbankkopie kann die vollständige Kette ab `0001` laufen; `0001` verwendet für die vorhandenen Grundtabellen ausschließlich `IF NOT EXISTS`.
 

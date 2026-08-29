@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const wizardPath = path.join(root, "public/js/lead-wizard.js");
 const reviewPath = path.join(root, "public/js/review.js");
+const analysisPath = path.join(root, "public/js/analysis.js");
+const analyticsPath = path.join(root, "public/js/site-analytics.js");
 const stylesPath = path.join(root, "src/styles/global.css");
 
 test("wizard keeps untrusted user and AI text out of raw HTML templates", async () => {
@@ -160,14 +162,56 @@ test("funnel analytics is aggregate, cookie-free and non-blocking", async () => 
   }
 });
 
-test("review dashboard loads the protected funnel report", async () => {
-  const source = await readFile(reviewPath, "utf8");
+test("analysis dashboard loads protected visitor and funnel reports", async () => {
+  const [source, page] = await Promise.all([
+    readFile(analysisPath, "utf8"),
+    readFile(path.join(root, "src/pages/review/analyse.astro"), "utf8"),
+  ]);
+  assert.match(source, /\/api\/review\/analytics\?days=/);
   assert.match(source, /\/api\/review\/funnel\?days=/);
-  assert.match(source, /data-funnel-steps/);
-  assert.match(source, /data-funnel-devices/);
-  assert.match(source, /data-funnel-entry/);
-  assert.match(source, /data-funnel-friction/);
+  assert.match(page, /data-analysis-dashboard hidden/);
+  assert.match(page, /data-analysis-timeline/);
+  assert.match(page, /data-analysis-pages/);
+  assert.match(page, /data-analysis-entries/);
+  assert.match(page, /data-analysis-sources/);
+  assert.match(page, /data-analysis-countries/);
+  assert.match(page, /data-funnel-steps/);
   assert.match(source, /vom Start bis zur gespeicherten Anfrage/);
+});
+
+test("inquiries and analysis are separate internal pages", async () => {
+  const [reviewPage, analysisPage, reviewScript] = await Promise.all([
+    readFile(path.join(root, "src/pages/review.astro"), "utf8"),
+    readFile(path.join(root, "src/pages/review/analyse.astro"), "utf8"),
+    readFile(reviewPath, "utf8"),
+  ]);
+  assert.match(reviewPage, /href="\/review\/analyse\/"/);
+  assert.match(analysisPage, /href="\/review\/"/);
+  assert.doesNotMatch(reviewPage, /data-funnel-panel/);
+  assert.doesNotMatch(reviewScript, /\/api\/review\/funnel/);
+});
+
+test("site reach measurement is cookie-free, coarse and honors Do Not Track", async () => {
+  const source = await readFile(analyticsPath, "utf8");
+  assert.match(source, /navigator\.doNotTrack\s*===\s*"1"/);
+  assert.match(source, /navigator\.globalPrivacyControl\s*===\s*true/);
+  assert.match(source, /\/api\/analytics\/pageview/);
+  assert.match(source, /keepalive:\s*true/);
+  assert.match(source, /location\.pathname/);
+  assert.doesNotMatch(source, /(?:localStorage|sessionStorage|document\.cookie)/);
+  assert.doesNotMatch(source, /location\.(?:search|hash)/);
+});
+
+test("analysis dashboard stays fully hidden until the shared token is accepted", async () => {
+  const [script, page] = await Promise.all([
+    readFile(analysisPath, "utf8"),
+    readFile(path.join(root, "src/pages/review/analyse.astro"), "utf8"),
+  ]);
+  assert.match(page, /data-analysis-auth-gate/);
+  assert.match(page, /data-analysis-dashboard hidden/);
+  assert.match(script, /dashboard\.hidden = true/);
+  assert.match(script, /dashboard\.hidden = false/);
+  assert.match(script, /sessionStorage\.getItem\("review-token"\)/);
 });
 
 test("review dashboard stays fully hidden until the review token is accepted", async () => {

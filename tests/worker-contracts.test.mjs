@@ -124,11 +124,36 @@ function funnelRequest({
   });
 }
 
+function analyticsRequest({
+  path = "/",
+  sourceGroup = "google",
+  deviceType = "mobile",
+  origin = allowedOrigin,
+  ip = "203.0.113.10",
+  userAgent = "Analytics Test Browser/1.0",
+} = {}) {
+  return new Request("https://api.example.test/api/analytics/pageview", {
+    method: "POST",
+    headers: {
+      Origin: origin,
+      "Content-Type": "application/json",
+      "X-Forwarded-For": ip,
+      "User-Agent": userAgent,
+    },
+    body: JSON.stringify({
+      page_path: path,
+      source_group: sourceGroup,
+      device_type: deviceType,
+    }),
+  });
+}
+
 test("review and photo endpoints fail closed without the exact token", async () => {
   const env = environment();
   const cases = [
     ["GET", "/api/review"],
     ["GET", "/api/review/funnel"],
+    ["GET", "/api/review/analytics"],
     ["POST", "/api/review/bulk"],
     ["GET", "/api/review/lead-1"],
     ["PATCH", "/api/review/lead-1"],
@@ -149,6 +174,85 @@ test("review and photo endpoints fail closed without the exact token", async () 
         assert.equal(response.status, 401, `${method} ${pathname} must be denied`);
       }
     }
+  } finally {
+    env.LEADS.close();
+  }
+});
+
+test("site analytics counts pageviews and daily visitors without raw identifiers", async () => {
+  const env = environment();
+  const rawIp = "203.0.113.77";
+  const rawAgent = "PRIVATE-ANALYTICS-UA-77";
+  try {
+    const requests = [
+      analyticsRequest({ ip: rawIp, userAgent: rawAgent }),
+      analyticsRequest({
+        path: "/instrument-verkaufen/",
+        sourceGroup: "internal",
+        ip: rawIp,
+        userAgent: rawAgent,
+      }),
+      analyticsRequest({ ip: "203.0.113.88", userAgent: rawAgent }),
+    ];
+    for (const request of requests) {
+      const response = await worker.fetch(request, env, context());
+      assert.equal(response.status, 202);
+    }
+
+    const views = env.LEADS.database
+      .prepare("SELECT SUM(view_count) AS count FROM site_pageviews_daily")
+      .get().count;
+    const visitors = env.LEADS.database
+      .prepare("SELECT SUM(visitor_count) AS count FROM site_visitors_daily")
+      .get().count;
+    assert.equal(views, 3);
+    assert.equal(visitors, 2, "the same browser must count once per calendar day");
+
+    const report = await worker.fetch(
+      new Request("https://api.example.test/api/review/analytics?days=30", {
+        headers: { Authorization: `Bearer ${env.REVIEW_TOKEN}` },
+      }),
+      env,
+      context(),
+    );
+    assert.equal(report.status, 200);
+    const payload = await report.json();
+    assert.equal(payload.totals.views, 3);
+    assert.equal(payload.totals.visitors, 2);
+    assert.equal(payload.pages[0].views >= 1, true);
+    assert.equal(payload.sources.some((row) => row.key === "google"), true);
+
+    const stored = JSON.stringify({
+      views: env.LEADS.database.prepare("SELECT * FROM site_pageviews_daily").all(),
+      visitors: env.LEADS.database.prepare("SELECT * FROM site_visitors_daily").all(),
+      uniques: env.LEADS.database.prepare("SELECT * FROM site_visitor_uniques").all(),
+      rates: env.LEADS.database.prepare("SELECT * FROM api_rate_limits").all(),
+    });
+    assert.equal(stored.includes(rawIp), false);
+    assert.equal(stored.includes(rawAgent), false);
+
+    for (const request of [
+      analyticsRequest({ path: "/review/" }),
+      analyticsRequest({ path: "/arbitrary-private-path/" }),
+      analyticsRequest({ sourceGroup: "google?q=private" }),
+    ]) {
+      const response = await worker.fetch(request, env, context());
+      assert.equal(response.status, 400);
+    }
+
+    const beforeBot = env.LEADS.database
+      .prepare("SELECT SUM(view_count) AS count FROM site_pageviews_daily")
+      .get().count;
+    const bot = await worker.fetch(
+      analyticsRequest({ userAgent: "Googlebot/2.1" }),
+      env,
+      context(),
+    );
+    assert.equal(bot.status, 202);
+    const afterBot = env.LEADS.database
+      .prepare("SELECT SUM(view_count) AS count FROM site_pageviews_daily")
+      .get().count;
+    assert.equal(afterBot, beforeBot);
   } finally {
     env.LEADS.close();
   }

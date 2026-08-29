@@ -1,0 +1,24 @@
+---
+const analysisPath = '/review/analyse/';
+---
+
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="robots" content="noindex,nofollow" />
+    <meta http-equiv="refresh" content={`0; url=${analysisPath}`} />
+    <link rel="canonical" href="https://musikinstrument-ankauf.de/review/analyse/" />
+    <title>Analyse – Musikinstrument Ankauf</title>
+    <script is:inline define:vars={{ analysisPath }}>
+      window.location.replace(`${analysisPath}${window.location.search}${window.location.hash}`);
+    </script>
+  </head>
+  <body>
+    <main>
+      <p>Die interne Analyse wird geöffnet.</p>
+      <p><a href={analysisPath}>Analyse öffnen</a></p>
+    </main>
+  </body>
+</html>
