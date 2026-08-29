@@ -1707,6 +1707,74 @@ select {
   color: var(--muted);
   font: 10px/1.45 Arial, sans-serif;
 }
+.review-funnel-insights {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.review-funnel-insights > section {
+  min-width: 0;
+  padding: 13px;
+  background: #f7f6f1;
+  border-radius: 6px;
+}
+.review-funnel-insights h3,
+.review-funnel-friction h3 {
+  margin: 0;
+  font: 700 12px Arial, sans-serif;
+}
+.review-funnel-insights > section > p {
+  margin: 3px 0 11px;
+  color: var(--muted);
+  font: 10px/1.35 Arial, sans-serif;
+}
+.review-funnel-breakdown {
+  display: grid;
+  gap: 7px;
+}
+.review-funnel-breakdown-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 8px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(31, 31, 31, 0.09);
+  font: 10px/1.35 Arial, sans-serif;
+}
+.review-funnel-breakdown-row:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+.review-funnel-breakdown-row strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.review-funnel-breakdown-row span {
+  grid-column: 1;
+  color: var(--muted);
+}
+.review-funnel-breakdown-row em {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  color: var(--accent);
+  font-size: 15px;
+  font-style: normal;
+}
+.review-funnel-empty {
+  margin: 0;
+  color: var(--muted);
+  font: 10px Arial, sans-serif;
+}
+.review-funnel-friction {
+  margin-top: 14px;
+}
+.review-funnel-friction .review-funnel-metrics {
+  margin-top: 8px;
+}
 .review-filter-groups {
   display: grid;
   gap: 8px;
@@ -1979,16 +2047,27 @@ select {
   padding: 28px;
   color: var(--muted);
 }
+.review-auth-gate {
+  display: grid;
+  min-height: min(680px, calc(100vh - 190px));
+  place-items: center;
+}
+.review-auth-gate[hidden],
+.review-dashboard[hidden] {
+  display: none;
+}
 .review-auth-state {
-  margin: auto;
-  padding: 38px 28px;
-  width: min(100%, 390px);
+  width: min(100%, 470px);
+  padding: clamp(30px, 5vw, 52px);
+  border: 1px solid var(--line);
+  background: #fff;
   color: var(--muted);
 }
+.review-auth-state h1,
 .review-auth-state h2 {
   margin: 4px 0 8px;
   color: var(--ink);
-  font-size: 28px;
+  font-size: clamp(34px, 5vw, 50px);
   font-weight: 400;
 }
 .review-auth-state form {
@@ -2364,7 +2443,8 @@ kbd {
     flex: 1;
   }
   .review-funnel-steps,
-  .review-funnel-secondary {
+  .review-funnel-secondary,
+  .review-funnel-insights {
     grid-template-columns: 1fr;
   }
   .review-filter-group {

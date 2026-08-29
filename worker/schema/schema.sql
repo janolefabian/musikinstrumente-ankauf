@@ -88,6 +88,23 @@ CREATE TABLE IF NOT EXISTS funnel_daily (
   PRIMARY KEY (event_date, event_name, instrument_type, device_type)
 );
 
+CREATE TABLE IF NOT EXISTS funnel_breakdowns_daily (
+  event_date TEXT NOT NULL,
+  event_name TEXT NOT NULL,
+  instrument_type TEXT NOT NULL DEFAULT 'unselected',
+  breakdown_name TEXT NOT NULL,
+  breakdown_value TEXT NOT NULL,
+  event_count INTEGER NOT NULL DEFAULT 0 CHECK (event_count >= 0),
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (
+    event_date,
+    event_name,
+    instrument_type,
+    breakdown_name,
+    breakdown_value
+  )
+);
+
 CREATE INDEX IF NOT EXISTS idx_leads_created ON leads(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_leads_class ON leads(lead_class, notable, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status, created_at DESC);
@@ -109,3 +126,5 @@ CREATE INDEX IF NOT EXISTS idx_lead_continuations_status
   ON lead_continuations(status, updated_at);
 CREATE INDEX IF NOT EXISTS idx_funnel_daily_event
   ON funnel_daily(event_name, event_date);
+CREATE INDEX IF NOT EXISTS idx_funnel_breakdowns_event
+  ON funnel_breakdowns_daily(breakdown_name, event_name, event_date);

@@ -103,6 +103,8 @@ function funnelRequest({
   event = "wizard_opened",
   instrumentType = "double_bass",
   deviceType = "mobile",
+  entryPage = "instrument",
+  sourceGroup = "google",
   origin = allowedOrigin,
 } = {}) {
   return new Request("https://api.example.test/api/funnel", {
@@ -115,6 +117,8 @@ function funnelRequest({
       event,
       instrument_type: instrumentType,
       device_type: deviceType,
+      entry_page: entryPage,
+      source_group: sourceGroup,
       email: "must-not-be-stored@example.invalid",
     }),
   });
@@ -170,6 +174,22 @@ test("funnel tracking stores only validated aggregate counters", async () => {
     assert.equal(invalid.status, 400);
     assert.equal((await invalid.json()).error, "funnel_event_invalid");
 
+    const invalidEntry = await worker.fetch(
+      funnelRequest({ entryPage: "/private/full-url" }),
+      env,
+      context(),
+    );
+    assert.equal(invalidEntry.status, 400);
+    assert.equal((await invalidEntry.json()).error, "funnel_entry_page_invalid");
+
+    const invalidSource = await worker.fetch(
+      funnelRequest({ sourceGroup: "google?q=private-search" }),
+      env,
+      context(),
+    );
+    assert.equal(invalidSource.status, 400);
+    assert.equal((await invalidSource.json()).error, "funnel_source_group_invalid");
+
     const foreignOrigin = await worker.fetch(
       funnelRequest({ origin: "https://attacker.invalid" }),
       env,
@@ -199,6 +219,41 @@ test("funnel tracking stores only validated aggregate counters", async () => {
       },
     ]);
 
+    const breakdownRows = env.LEADS.database
+      .prepare(
+        `SELECT breakdown_name,breakdown_value,event_name,event_count
+         FROM funnel_breakdowns_daily
+         ORDER BY breakdown_name,event_name`,
+      )
+      .all()
+      .map((row) => ({ ...row }));
+    assert.deepEqual(breakdownRows, [
+      {
+        breakdown_name: "entry_page",
+        breakdown_value: "instrument",
+        event_name: "contact_reached",
+        event_count: 1,
+      },
+      {
+        breakdown_name: "entry_page",
+        breakdown_value: "instrument",
+        event_name: "wizard_opened",
+        event_count: 2,
+      },
+      {
+        breakdown_name: "source_group",
+        breakdown_value: "google",
+        event_name: "contact_reached",
+        event_count: 1,
+      },
+      {
+        breakdown_name: "source_group",
+        breakdown_value: "google",
+        event_name: "wizard_opened",
+        event_count: 2,
+      },
+    ]);
+
     const report = await worker.fetch(
       new Request("https://api.example.test/api/review/funnel?days=7", {
         headers: { Authorization: `Bearer ${env.REVIEW_TOKEN}` },
@@ -212,6 +267,10 @@ test("funnel tracking stores only validated aggregate counters", async () => {
     assert.equal(payload.totals.wizard_opened, 2);
     assert.equal(payload.totals.contact_reached, 1);
     assert.equal(payload.by_type.double_bass.wizard_opened, 2);
+    assert.equal(payload.by_device.mobile.wizard_opened, 2);
+    assert.equal(payload.by_device_type.double_bass.mobile.wizard_opened, 2);
+    assert.equal(payload.breakdowns.entry_page.instrument.wizard_opened, 2);
+    assert.equal(payload.breakdowns.source_group.google.contact_reached, 1);
     assert.equal(JSON.stringify(payload).includes("must-not-be-stored"), false);
   } finally {
     env.LEADS.close();

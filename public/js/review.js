@@ -2,6 +2,12 @@
   const root = document.querySelector("[data-review]");
   if (!root) return;
 
+  const authGateEl = root.querySelector("[data-review-auth-gate]");
+  const dashboardEl = root.querySelector("[data-review-dashboard]");
+  const loginFormEl = root.querySelector("[data-review-login]");
+  const loginInputEl = root.querySelector("[data-review-token]");
+  const loginSubmitEl = root.querySelector("[data-review-login-submit]");
+  const authErrorEl = root.querySelector("[data-auth-error]");
   const listEl = root.querySelector("[data-review-grid]");
   const detailEl = root.querySelector("[data-review-detail]");
   const searchEl = root.querySelector("[data-review-search]");
@@ -18,6 +24,10 @@
   const funnelStepsEl = root.querySelector("[data-funnel-steps]");
   const funnelPhotosEl = root.querySelector("[data-funnel-photos]");
   const funnelErrorsEl = root.querySelector("[data-funnel-errors]");
+  const funnelDevicesEl = root.querySelector("[data-funnel-devices]");
+  const funnelEntryEl = root.querySelector("[data-funnel-entry]");
+  const funnelSourcesEl = root.querySelector("[data-funnel-sources]");
+  const funnelFrictionEl = root.querySelector("[data-funnel-friction]");
   const funnelTypeEl = root.querySelector("[data-funnel-type]");
   const lightbox = root.querySelector("[data-lightbox]");
   const actionDialogEl = root.querySelector("[data-action-dialog]");
@@ -115,6 +125,7 @@
   let funnelLoadedDays = null;
   let funnelLoading = false;
   let funnelRequestSequence = 0;
+  let dashboardUnlocked = false;
   const imageCache = new Map();
   const objectUrls = new Set();
   const imageQueue = [];
@@ -139,6 +150,13 @@
     additional_photo_uploaded: "Weitere Fotos übertragen",
     lead_submit_error: "Fehler beim Speichern",
     continuation_submit_error: "Fehler bei weiteren Fotos",
+    photo_skipped: "Fotostufe übersprungen",
+    photo_warning_shown: "Fotohinweis angezeigt",
+    photo_warning_overridden: "Foto trotz Hinweis verwendet",
+    photo_check_unavailable: "Automatische Fotoprüfung nicht erreichbar",
+    back_used: "Zurück verwendet",
+    early_finish: "Frühzeitig abgeschlossen",
+    contact_validation_failed: "Kontaktformular unvollständig",
   };
   const funnelTypeLabels = {
     double_bass: "Kontrabass",
@@ -148,6 +166,31 @@
     estate: "Mehrere Instrumente / Nachlass",
     unknown: "Nicht eingeordnet",
     other: "Anderes Instrument / Zubehör",
+  };
+  const funnelDeviceLabels = {
+    mobile: "Smartphone",
+    tablet: "Tablet",
+    desktop: "Computer",
+    unknown: "Unbekannt",
+  };
+  const funnelEntryLabels = {
+    direct: "Direkt zum Formular",
+    home: "Startseite",
+    city: "Stadtseite",
+    instrument: "Instrumenten-Fachseite",
+    story: "Instrumentengeschichte",
+    other_internal: "Andere eigene Seite",
+    external: "Externe Seite",
+    unknown: "Unbekannt",
+  };
+  const funnelSourceLabels = {
+    direct: "Direkter Aufruf",
+    internal: "Eigene Website",
+    google: "Google",
+    bing: "Bing",
+    duckduckgo: "DuckDuckGo",
+    external: "Andere Website",
+    unknown: "Unbekannt",
   };
 
   const esc = (s) =>
@@ -310,7 +353,7 @@
             : `${Math.abs(change)} mehr als davor`;
         const width = count ? Math.max(3, Math.round((count / scale) * 100)) : 0;
         return `<div class="review-funnel-step">
-          <div class="review-funnel-step-head"><strong>${funnelLabels[event] || event}</strong><span>${count}</span></div>
+          <div class="review-funnel-step-head"><strong>${esc(funnelLabels[event] || event)}</strong><span>${count}</span></div>
           <div class="review-funnel-track" aria-hidden="true"><span style="width:${width}%"></span></div>
           <small>${fromStart} % vom Start · ${comparison}</small>
         </div>`;
@@ -320,7 +363,7 @@
     const metricMarkup = (events) =>
       events
         .map(
-          (event) => `<div><strong>${funnelCount(counts, event)}</strong><span>${funnelLabels[event] || event}</span></div>`,
+          (event) => `<div><strong>${funnelCount(counts, event)}</strong><span>${esc(funnelLabels[event] || event)}</span></div>`,
         )
         .join("");
     funnelPhotosEl.innerHTML = metricMarkup(
@@ -329,6 +372,60 @@
     funnelErrorsEl.innerHTML = metricMarkup(
       funnelPayload.events?.diagnostics || [],
     );
+    funnelFrictionEl.innerHTML = metricMarkup(
+      funnelPayload.events?.friction || [],
+    );
+
+    const startEvent = selectedType === "all" ? "wizard_opened" : "type_selected";
+    const deviceData = selectedType === "all"
+      ? funnelPayload.by_device || {}
+      : funnelPayload.by_device_type?.[selectedType] || {};
+    const breakdownData = selectedType === "all"
+      ? funnelPayload.breakdowns || {}
+      : funnelPayload.breakdowns_by_type?.[selectedType] || {};
+    renderConversionBreakdown(
+      funnelDevicesEl,
+      deviceData,
+      funnelDeviceLabels,
+      startEvent,
+    );
+    renderConversionBreakdown(
+      funnelEntryEl,
+      breakdownData.entry_page || {},
+      funnelEntryLabels,
+      startEvent,
+    );
+    renderConversionBreakdown(
+      funnelSourcesEl,
+      breakdownData.source_group || {},
+      funnelSourceLabels,
+      startEvent,
+    );
+  }
+
+  function renderConversionBreakdown(container, groups, labels, startEvent) {
+    const rows = Object.entries(groups)
+      .map(([key, eventCounts]) => ({
+        key,
+        starts: funnelCount(eventCounts, startEvent),
+        saved: funnelCount(eventCounts, "lead_saved"),
+      }))
+      .filter((row) => row.starts || row.saved)
+      .sort((a, b) => b.starts - a.starts || b.saved - a.saved);
+    container.innerHTML = rows.length
+      ? rows
+          .map((row) => {
+            const conversion = row.starts
+              ? Math.round((row.saved / row.starts) * 100)
+              : 0;
+            return `<div class="review-funnel-breakdown-row">
+              <strong>${esc(labels[row.key] || row.key)}</strong>
+              <span>${row.starts} Starts · ${row.saved} gespeichert</span>
+              <em>${conversion} %</em>
+            </div>`;
+          })
+          .join("")
+      : '<p class="review-funnel-empty">Noch keine Daten.</p>';
   }
 
   function populateFunnelTypes() {
@@ -375,7 +472,11 @@
       renderFunnel();
     } catch (error) {
       if (sequence !== funnelRequestSequence) return;
-      if (error.status === 401) funnelPanelEl.hidden = true;
+      if (error.status === 401) {
+        token = "";
+        sessionStorage.removeItem("review-token");
+        renderAuthGate(true);
+      }
       else {
         console.error(error);
         funnelSummaryEl.innerHTML =
@@ -383,6 +484,10 @@
         funnelStepsEl.innerHTML = "";
         funnelPhotosEl.innerHTML = "";
         funnelErrorsEl.innerHTML = "";
+        funnelDevicesEl.innerHTML = "";
+        funnelEntryEl.innerHTML = "";
+        funnelSourcesEl.innerHTML = "";
+        funnelFrictionEl.innerHTML = "";
       }
     } finally {
       if (sequence === funnelRequestSequence) funnelLoading = false;
@@ -470,42 +575,44 @@
     });
   }
 
-  function renderAuthGate(invalid = false) {
+  function setLoginBusy(busy) {
+    loginInputEl.disabled = busy;
+    loginSubmitEl.disabled = busy;
+    loginSubmitEl.textContent = busy ? "Wird geprüft …" : "Dashboard öffnen";
+  }
+
+  function unlockDashboard() {
+    dashboardUnlocked = true;
+    authGateEl.hidden = true;
+    dashboardEl.hidden = false;
+    authErrorEl.textContent = "";
+    setLoginBusy(false);
+  }
+
+  function renderAuthGate(invalid = false, message = "") {
+    dashboardUnlocked = false;
+    dashboardEl.hidden = true;
+    authGateEl.hidden = false;
     unobserveImages(listEl);
     leads = [];
     filteredTotal = 0;
     hasMore = false;
     selectedLeadIds.clear();
-    resultCountEl.textContent = "Geschützt";
+    resultCountEl.textContent = "";
     bulkBarEl.hidden = true;
     loadMoreEl.hidden = true;
     funnelPanelEl.hidden = true;
     funnelPayload = null;
     funnelLoadedDays = null;
-    listEl.innerHTML = `
-      <div class="review-auth-state">
-        <p class="eyebrow">Interner Bereich</p>
-        <h2>Dashboard entsperren</h2>
-        <p>Geben Sie den Review-Zugangsschlüssel ein. Er bleibt nur für diese Browsersitzung gespeichert.</p>
-        <form data-review-login>
-          <label for="review-access-token">Zugangsschlüssel</label>
-          <input id="review-access-token" type="password" autocomplete="current-password" required data-review-token>
-          <button type="submit">Dashboard öffnen</button>
-          <p class="review-auth-error" data-auth-error>${invalid ? "Der Zugangsschlüssel ist nicht korrekt. Bitte versuchen Sie es erneut." : ""}</p>
-        </form>
-      </div>`;
+    listEl.innerHTML = "";
+    detailEl.innerHTML = "";
+    authErrorEl.textContent = message || (invalid
+      ? "Der Zugangsschlüssel ist nicht korrekt. Bitte versuchen Sie es erneut."
+      : "");
+    loginInputEl.value = "";
+    setLoginBusy(false);
     syncSelectionUI();
-    const form = listEl.querySelector("[data-review-login]");
-    const input = listEl.querySelector("[data-review-token]");
-    form.onsubmit = async (event) => {
-      event.preventDefault();
-      const entered = input.value.trim();
-      if (!entered) return;
-      token = entered;
-      sessionStorage.setItem("review-token", token);
-      await loadLeads({ reset: true });
-    };
-    input.focus();
+    loginInputEl.focus();
   }
 
   function runImageQueue() {
@@ -687,6 +794,7 @@
 
   async function loadLeads({ reset = false } = {}) {
     if (!api) {
+      unlockDashboard();
       if (reset) selectedLeadIds.clear();
       leads = demoLeads();
       filteredTotal = leads.length;
@@ -732,6 +840,7 @@
       updateCounts(
         Array.isArray(payload) ? countsFor(leads) : payload.counts || {},
       );
+      unlockDashboard();
       renderList();
       if (reset) void loadFunnel();
     } catch (error) {
@@ -752,6 +861,10 @@
           error.status === 503
               ? "Der Review-Zugang ist im Worker noch nicht eingerichtet."
               : "Die Dashboard-API ist gerade nicht erreichbar. Bitte prüfen, ob der lokale Worker läuft.";
+        if (!dashboardUnlocked) {
+          renderAuthGate(false, message);
+          return;
+        }
         listEl.innerHTML =
           `<div class="review-no-results"><p>${message}</p><button class="ghost-button" type="button" data-retry-dashboard>Erneut versuchen</button></div>`;
         listEl.querySelector("[data-retry-dashboard]").onclick = () =>
@@ -1106,6 +1219,17 @@
   actionDialogCancelButton.onclick = () => closeActionDialog(false);
   actionDialogConfirmButton.onclick = () => closeActionDialog(true);
 
+  loginFormEl.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const entered = loginInputEl.value.trim();
+    if (!entered) return;
+    token = entered;
+    sessionStorage.setItem("review-token", token);
+    authErrorEl.textContent = "";
+    setLoginBusy(true);
+    await loadLeads({ reset: true });
+  });
+
   root.querySelectorAll("[data-filter]").forEach((button) => {
     button.onclick = () => {
       currentFilter = button.dataset.filter;
@@ -1162,7 +1286,11 @@
 
   (async () => {
     const id = new URLSearchParams(location.search).get("lead");
+    if (api && !token) {
+      renderAuthGate(false);
+      return;
+    }
     await loadLeads({ reset: true });
-    if (id) await openLead(id, { keepUrl: true });
+    if (id && dashboardUnlocked) await openLead(id, { keepUrl: true });
   })();
 })();

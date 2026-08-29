@@ -175,6 +175,66 @@
   const trackedFunnelEvents = new Set();
   let shouldFocusStage = false;
 
+  function funnelReferrer() {
+    if (!document.referrer) return null;
+    try {
+      return new URL(document.referrer);
+    } catch (_) {
+      return null;
+    }
+  }
+  function funnelEntryPage() {
+    if (initialCity) return "city";
+    const referrer = funnelReferrer();
+    if (!referrer) return "direct";
+    if (referrer.origin !== location.origin) return "external";
+    const path = referrer.pathname.replace(/\/+$/, "") || "/";
+    if (path === "/") return "home";
+    if (path.startsWith("/instrumentengeschichten")) return "story";
+    if (
+      [
+        "/bogen-verkaufen",
+        "/cello-verkaufen",
+        "/geige-verkaufen",
+        "/instrument-geerbt",
+        "/kontrabass-verkaufen",
+        "/kontrabassbogen-verkaufen",
+      ].includes(path)
+    )
+      return "instrument";
+    if (path === "/instrument-verkaufen") return "direct";
+    return "other_internal";
+  }
+  function funnelSourceGroup() {
+    const referrer = funnelReferrer();
+    if (referrer && referrer.origin !== location.origin) {
+      const host = referrer.hostname.toLowerCase();
+      if (/(^|\.)google\./.test(host)) return "google";
+      if (host === "bing.com" || host.endsWith(".bing.com")) return "bing";
+      if (host === "duckduckgo.com" || host.endsWith(".duckduckgo.com"))
+        return "duckduckgo";
+      return "external";
+    }
+    try {
+      const saved = JSON.parse(
+        sessionStorage.getItem("instrument-funnel-source-v1") || "null",
+      );
+      if (
+        saved &&
+        ["google", "bing", "duckduckgo", "external"].includes(saved.value) &&
+        Number(saved.expires_at) > Date.now()
+      )
+        return saved.value;
+    } catch (_) {
+      // A blocked sessionStorage leaves the anonymous source unknown.
+    }
+    return referrer ? "internal" : "direct";
+  }
+  const funnelContext = {
+    entry_page: funnelEntryPage(),
+    source_group: funnelSourceGroup(),
+  };
+
   const state = {
     type: initialType,
     step: "type",
@@ -219,6 +279,7 @@
         event,
         instrument_type: type,
         device_type: funnelDeviceType(),
+        ...funnelContext,
       }),
       keepalive: true,
     }).catch(() => {
@@ -397,6 +458,7 @@
   function goBack() {
     const last = state.history.pop();
     if (!last) return;
+    trackFunnel("back_used");
     state.step = last.step;
     state.photoIndex = last.photoIndex;
     shouldFocusStage = true;
@@ -552,12 +614,14 @@
     const earlyButton = stage.querySelector("[data-early]");
     if (earlyButton)
       earlyButton.onclick = () => {
+        trackFunnel("early_finish");
         if (state.photos.length > state.uploadedPhotoCount) push("details");
         else finish();
       };
     const skipButton = stage.querySelector("[data-skip]");
     if (skipButton)
       skipButton.onclick = () => {
+        trackFunnel("photo_skipped");
         state.photoIndex++;
         shouldFocusStage = true;
         persistContinuation();
@@ -766,12 +830,16 @@
   }
 
   function requestPhotoDecision(quality, preview, message) {
+    trackFunnel("photo_warning_shown");
     return new Promise((resolve) => {
       showQuality(quality, "retry", message, [
         {
           label: "Foto trotzdem verwenden",
           className: "continue-button",
-          onClick: () => resolve(true),
+          onClick: () => {
+            trackFunnel("photo_warning_overridden");
+            resolve(true);
+          },
         },
         {
           label: "Neues Foto wählen",
@@ -856,6 +924,7 @@
     try {
       result = await aiCheck(small, item);
     } catch (_) {
+      trackFunnel("photo_check_unavailable");
       addAcceptedPhoto(
         selected,
         item,
@@ -994,6 +1063,11 @@
     stage.querySelector("[data-type-summary]").textContent =
       TYPES.find(([type]) => type === state.type)?.[1] || "Instrument";
     form.addEventListener("submit", submit);
+    form.addEventListener(
+      "invalid",
+      () => trackFunnel("contact_validation_failed"),
+      true,
+    );
   }
 
   async function appendPhotos(formData, photos) {
@@ -1248,7 +1322,10 @@
         persistContinuation();
         render();
       };
-    stage.querySelector("[data-finish]").onclick = finish;
+    stage.querySelector("[data-finish]").onclick = () => {
+      trackFunnel("early_finish");
+      finish();
+    };
   }
 
   function doneScreen() {

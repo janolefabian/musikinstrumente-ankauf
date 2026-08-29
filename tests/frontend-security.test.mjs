@@ -148,6 +148,13 @@ test("funnel analytics is aggregate, cookie-free and non-blocking", async () => 
     "additional_photos_started",
     "additional_photo_uploaded",
     "flow_completed",
+    "photo_skipped",
+    "photo_warning_shown",
+    "photo_warning_overridden",
+    "photo_check_unavailable",
+    "back_used",
+    "early_finish",
+    "contact_validation_failed",
   ]) {
     assert.match(source, new RegExp(`trackFunnel\\(\\"${event}\\"`));
   }
@@ -157,5 +164,21 @@ test("review dashboard loads the protected funnel report", async () => {
   const source = await readFile(reviewPath, "utf8");
   assert.match(source, /\/api\/review\/funnel\?days=/);
   assert.match(source, /data-funnel-steps/);
+  assert.match(source, /data-funnel-devices/);
+  assert.match(source, /data-funnel-entry/);
+  assert.match(source, /data-funnel-friction/);
   assert.match(source, /vom Start bis zur gespeicherten Anfrage/);
+});
+
+test("review dashboard stays fully hidden until the review token is accepted", async () => {
+  const [script, page] = await Promise.all([
+    readFile(reviewPath, "utf8"),
+    readFile(path.join(root, "src/pages/review.astro"), "utf8"),
+  ]);
+  assert.match(page, /data-review-auth-gate/);
+  assert.match(page, /data-review-dashboard hidden/);
+  assert.match(script, /function unlockDashboard\(\)/);
+  assert.match(script, /dashboardEl\.hidden = true/);
+  assert.match(script, /dashboardEl\.hidden = false/);
+  assert.match(script, /if \(api && !token\)/);
 });

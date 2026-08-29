@@ -81,10 +81,20 @@ const FUNNEL_DIAGNOSTIC_EVENTS = [
   "lead_submit_error",
   "continuation_submit_error",
 ];
+const FUNNEL_FRICTION_EVENTS = [
+  "photo_skipped",
+  "photo_warning_shown",
+  "photo_warning_overridden",
+  "photo_check_unavailable",
+  "back_used",
+  "early_finish",
+  "contact_validation_failed",
+];
 const FUNNEL_EVENTS = new Set([
   ...FUNNEL_STEP_EVENTS,
   ...FUNNEL_PHOTO_EVENTS,
   ...FUNNEL_DIAGNOSTIC_EVENTS,
+  ...FUNNEL_FRICTION_EVENTS,
 ]);
 const FUNNEL_INSTRUMENT_TYPES = new Set([
   ...ALLOWED_INSTRUMENT_TYPES,
@@ -94,6 +104,25 @@ const FUNNEL_DEVICE_TYPES = new Set([
   "mobile",
   "tablet",
   "desktop",
+  "unknown",
+]);
+const FUNNEL_ENTRY_PAGES = new Set([
+  "direct",
+  "home",
+  "city",
+  "instrument",
+  "story",
+  "other_internal",
+  "external",
+  "unknown",
+]);
+const FUNNEL_SOURCE_GROUPS = new Set([
+  "direct",
+  "internal",
+  "google",
+  "bing",
+  "duckduckgo",
+  "external",
   "unknown",
 ]);
 const FUNNEL_RETENTION_DAYS = 400;
@@ -1839,31 +1868,52 @@ async function recordFunnelEvent(request, env) {
     20,
     "funnel_device_type",
   );
+  const entryPage = boundedText(
+    body.entry_page || "unknown",
+    30,
+    "funnel_entry_page",
+  );
+  const sourceGroup = boundedText(
+    body.source_group || "unknown",
+    30,
+    "funnel_source_group",
+  );
   if (!FUNNEL_EVENTS.has(event)) apiError(400, "funnel_event_invalid");
   if (!FUNNEL_INSTRUMENT_TYPES.has(instrumentType))
     apiError(400, "funnel_instrument_type_invalid");
   if (!FUNNEL_DEVICE_TYPES.has(deviceType))
     apiError(400, "funnel_device_type_invalid");
+  if (!FUNNEL_ENTRY_PAGES.has(entryPage))
+    apiError(400, "funnel_entry_page_invalid");
+  if (!FUNNEL_SOURCE_GROUPS.has(sourceGroup))
+    apiError(400, "funnel_source_group_invalid");
 
   const now = new Date();
   const updatedAt = now.toISOString();
-  await env.LEADS.prepare(
-    `INSERT INTO funnel_daily
-      (event_date,event_name,instrument_type,device_type,event_count,updated_at)
-     VALUES (?,?,?,?,1,?)
-     ON CONFLICT(event_date,event_name,instrument_type,device_type)
-     DO UPDATE SET
-       event_count=funnel_daily.event_count+1,
-       updated_at=excluded.updated_at`,
-  )
-    .bind(
-      updatedAt.slice(0, 10),
-      event,
-      instrumentType,
-      deviceType,
-      updatedAt,
-    )
-    .run();
+  const eventDate = updatedAt.slice(0, 10);
+  const breakdownStatement = (name, value) =>
+    env.LEADS.prepare(
+      `INSERT INTO funnel_breakdowns_daily
+        (event_date,event_name,instrument_type,breakdown_name,breakdown_value,event_count,updated_at)
+       VALUES (?,?,?,?,?,1,?)
+       ON CONFLICT(event_date,event_name,instrument_type,breakdown_name,breakdown_value)
+       DO UPDATE SET
+         event_count=funnel_breakdowns_daily.event_count+1,
+         updated_at=excluded.updated_at`,
+    ).bind(eventDate, event, instrumentType, name, value, updatedAt);
+  await env.LEADS.batch([
+    env.LEADS.prepare(
+      `INSERT INTO funnel_daily
+        (event_date,event_name,instrument_type,device_type,event_count,updated_at)
+       VALUES (?,?,?,?,1,?)
+       ON CONFLICT(event_date,event_name,instrument_type,device_type)
+       DO UPDATE SET
+         event_count=funnel_daily.event_count+1,
+         updated_at=excluded.updated_at`,
+    ).bind(eventDate, event, instrumentType, deviceType, updatedAt),
+    breakdownStatement("entry_page", entryPage),
+    breakdownStatement("source_group", sourceGroup),
+  ]);
   return json({ ok: true }, 202, request, env);
 }
 
@@ -1893,6 +1943,7 @@ async function reviewFunnel(request, env) {
   const totals = emptyFunnelCounts();
   const byType = {};
   const byDevice = {};
+  const byDeviceType = {};
   for (const row of results) {
     if (!FUNNEL_EVENTS.has(row.event_name)) continue;
     const count = Number(row.count || 0);
@@ -1901,6 +1952,35 @@ async function reviewFunnel(request, env) {
     byType[row.instrument_type][row.event_name] += count;
     byDevice[row.device_type] ||= emptyFunnelCounts();
     byDevice[row.device_type][row.event_name] += count;
+    byDeviceType[row.instrument_type] ||= {};
+    byDeviceType[row.instrument_type][row.device_type] ||= emptyFunnelCounts();
+    byDeviceType[row.instrument_type][row.device_type][row.event_name] += count;
+  }
+
+  const { results: breakdownRows = [] } = await env.LEADS.prepare(
+    `SELECT event_name,instrument_type,breakdown_name,breakdown_value,
+            SUM(event_count) AS count
+     FROM funnel_breakdowns_daily
+     WHERE event_date>=? AND event_date<=?
+     GROUP BY event_name,instrument_type,breakdown_name,breakdown_value`,
+  )
+    .bind(from, to)
+    .all();
+  const breakdowns = {};
+  const breakdownsByType = {};
+  for (const row of breakdownRows) {
+    if (!FUNNEL_EVENTS.has(row.event_name)) continue;
+    const count = Number(row.count || 0);
+    breakdowns[row.breakdown_name] ||= {};
+    breakdowns[row.breakdown_name][row.breakdown_value] ||= emptyFunnelCounts();
+    breakdowns[row.breakdown_name][row.breakdown_value][row.event_name] += count;
+    breakdownsByType[row.instrument_type] ||= {};
+    breakdownsByType[row.instrument_type][row.breakdown_name] ||= {};
+    breakdownsByType[row.instrument_type][row.breakdown_name][row.breakdown_value] ||=
+      emptyFunnelCounts();
+    breakdownsByType[row.instrument_type][row.breakdown_name][row.breakdown_value][
+      row.event_name
+    ] += count;
   }
 
   return json(
@@ -1910,10 +1990,14 @@ async function reviewFunnel(request, env) {
         steps: FUNNEL_STEP_EVENTS,
         photos: FUNNEL_PHOTO_EVENTS,
         diagnostics: FUNNEL_DIAGNOSTIC_EVENTS,
+        friction: FUNNEL_FRICTION_EVENTS,
       },
       totals,
       by_type: byType,
       by_device: byDevice,
+      by_device_type: byDeviceType,
+      breakdowns,
+      breakdowns_by_type: breakdownsByType,
     },
     200,
     request,
@@ -2416,6 +2500,9 @@ async function cleanupJournals(env) {
     ).bind(cutoff),
     env.LEADS.prepare(
       `DELETE FROM funnel_daily WHERE event_date<?`,
+    ).bind(funnelCutoff),
+    env.LEADS.prepare(
+      `DELETE FROM funnel_breakdowns_daily WHERE event_date<?`,
     ).bind(funnelCutoff),
   ]);
 }

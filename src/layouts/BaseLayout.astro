@@ -59,6 +59,31 @@ const organization = {
     <title>{title}</title>
   </head>
   <body>
+    <script is:inline>
+      (() => {
+        const key = "instrument-funnel-source-v1";
+        if (!document.referrer) return;
+        try {
+          const referrer = new URL(document.referrer);
+          if (referrer.origin === location.origin) return;
+          const host = referrer.hostname.toLowerCase();
+          let value = "external";
+          if (/(^|\.)google\./.test(host)) value = "google";
+          else if (host === "bing.com" || host.endsWith(".bing.com")) value = "bing";
+          else if (
+            host === "duckduckgo.com" ||
+            host.endsWith(".duckduckgo.com")
+          )
+            value = "duckduckgo";
+          sessionStorage.setItem(
+            key,
+            JSON.stringify({ value, expires_at: Date.now() + 30 * 60 * 1000 }),
+          );
+        } catch (_) {
+          // Source grouping is optional and must never affect the page.
+        }
+      })();
+    </script>
     <a class="skip-link" href="#main-content">Zum Inhalt springen</a>
     <header class="site-header">
       <a class="brand" href="/">Musikinstrument <span>Ankauf</span></a>

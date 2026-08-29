@@ -4,6 +4,21 @@ const apiBase = import.meta.env.PUBLIC_API_BASE || '';
 ---
 <BaseLayout title="Review – Musikinstrument Ankauf" robots="noindex,nofollow">
   <section class="review-page review-shell" data-review data-api-base={apiBase}>
+    <section class="review-auth-gate" data-review-auth-gate aria-labelledby="review-auth-title">
+      <div class="review-auth-state">
+        <p class="eyebrow">Interner Bereich</p>
+        <h1 id="review-auth-title">Dashboard entsperren</h1>
+        <p>Geben Sie den Review-Zugangsschlüssel ein. Er bleibt nur für diese Browsersitzung gespeichert.</p>
+        <form data-review-login>
+          <label for="review-access-token">Zugangsschlüssel</label>
+          <input id="review-access-token" type="password" autocomplete="current-password" required data-review-token />
+          <button type="submit" data-review-login-submit>Dashboard öffnen</button>
+          <p class="review-auth-error" data-auth-error role="alert" aria-live="polite"></p>
+        </form>
+      </div>
+    </section>
+
+    <div class="review-dashboard" data-review-dashboard hidden>
     <header class="review-header review-toolbar">
       <div>
         <p class="eyebrow">Intern</p>
@@ -49,6 +64,27 @@ const apiBase = import.meta.env.PUBLIC_API_BASE || '';
           <div class="review-funnel-metrics" data-funnel-errors></div>
         </section>
       </div>
+      <div class="review-funnel-insights">
+        <section>
+          <h3>Nach Gerät</h3>
+          <p>Start bis gespeicherte Anfrage</p>
+          <div class="review-funnel-breakdown" data-funnel-devices></div>
+        </section>
+        <section>
+          <h3>Einstiegsseite</h3>
+          <p>Grob gruppiert, ohne vollständige URL</p>
+          <div class="review-funnel-breakdown" data-funnel-entry></div>
+        </section>
+        <section>
+          <h3>Zugriffsweg</h3>
+          <p>Ohne Suchbegriffe oder Referrer-URL</p>
+          <div class="review-funnel-breakdown" data-funnel-sources></div>
+        </section>
+      </div>
+      <section class="review-funnel-friction">
+        <h3>Wo hakt es?</h3>
+        <div class="review-funnel-metrics" data-funnel-friction></div>
+      </section>
       <p class="review-funnel-note">Cookie-freie, aggregierte Zählung. Es werden keine Personen oder einzelnen Sitzungen gespeichert; ein erneuter Seitenaufruf kann deshalb erneut zählen.</p>
     </section>
 
@@ -124,6 +160,7 @@ const apiBase = import.meta.env.PUBLIC_API_BASE || '';
         </div>
       </section>
     </div>
+    </div>
   </section>
-  <script src="/js/review.js?v=20260827-1" is:inline></script>
+  <script src="/js/review.js?v=20260829-1" is:inline></script>
 </BaseLayout>
