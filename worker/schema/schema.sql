@@ -105,6 +105,15 @@ CREATE TABLE IF NOT EXISTS funnel_breakdowns_daily (
   )
 );
 
+CREATE TABLE IF NOT EXISTS funnel_event_uniques (
+  event_date TEXT NOT NULL,
+  event_name TEXT NOT NULL,
+  visitor_hash TEXT NOT NULL,
+  claim_token TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (event_date, event_name, visitor_hash)
+);
+
 CREATE TABLE IF NOT EXISTS site_pageviews_daily (
   event_date TEXT NOT NULL,
   hour_of_day INTEGER NOT NULL CHECK (hour_of_day BETWEEN 0 AND 23),
@@ -173,6 +182,8 @@ CREATE INDEX IF NOT EXISTS idx_funnel_daily_event
   ON funnel_daily(event_name, event_date);
 CREATE INDEX IF NOT EXISTS idx_funnel_breakdowns_event
   ON funnel_breakdowns_daily(breakdown_name, event_name, event_date);
+CREATE INDEX IF NOT EXISTS idx_funnel_event_uniques_created
+  ON funnel_event_uniques(created_at);
 CREATE INDEX IF NOT EXISTS idx_site_pageviews_date
   ON site_pageviews_daily(event_date, page_path);
 CREATE INDEX IF NOT EXISTS idx_site_visitors_date

@@ -2079,30 +2079,66 @@ async function recordFunnelEvent(request, env) {
   const now = new Date();
   const updatedAt = now.toISOString();
   const eventDate = berlinDateParts(now).date;
+  const visitorHash = await analyticsVisitorHash(request, env, eventDate);
+  if (!visitorHash) apiError(503, "analytics_not_configured");
+  const claimToken = crypto.randomUUID();
+  const claimBindings = [eventDate, event, visitorHash, claimToken];
   const breakdownStatement = (name, value) =>
     env.LEADS.prepare(
       `INSERT INTO funnel_breakdowns_daily
         (event_date,event_name,instrument_type,breakdown_name,breakdown_value,event_count,updated_at)
-       VALUES (?,?,?,?,?,1,?)
+       SELECT ?,?,?,?,?,1,?
+       FROM funnel_event_uniques
+       WHERE event_date=? AND event_name=? AND visitor_hash=? AND claim_token=?
        ON CONFLICT(event_date,event_name,instrument_type,breakdown_name,breakdown_value)
        DO UPDATE SET
          event_count=funnel_breakdowns_daily.event_count+1,
          updated_at=excluded.updated_at`,
-    ).bind(eventDate, event, instrumentType, name, value, updatedAt);
-  await env.LEADS.batch([
+    ).bind(
+      eventDate,
+      event,
+      instrumentType,
+      name,
+      value,
+      updatedAt,
+      ...claimBindings,
+    );
+  const results = await env.LEADS.batch([
+    env.LEADS.prepare(
+      `INSERT OR IGNORE INTO funnel_event_uniques
+        (event_date,event_name,visitor_hash,claim_token,created_at)
+       VALUES (?,?,?,?,?)`,
+    ).bind(eventDate, event, visitorHash, claimToken, updatedAt),
     env.LEADS.prepare(
       `INSERT INTO funnel_daily
         (event_date,event_name,instrument_type,device_type,event_count,updated_at)
-       VALUES (?,?,?,?,1,?)
+       SELECT ?,?,?,?,1,?
+       FROM funnel_event_uniques
+       WHERE event_date=? AND event_name=? AND visitor_hash=? AND claim_token=?
        ON CONFLICT(event_date,event_name,instrument_type,device_type)
        DO UPDATE SET
          event_count=funnel_daily.event_count+1,
          updated_at=excluded.updated_at`,
-    ).bind(eventDate, event, instrumentType, deviceType, updatedAt),
+    ).bind(
+      eventDate,
+      event,
+      instrumentType,
+      deviceType,
+      updatedAt,
+      ...claimBindings,
+    ),
     breakdownStatement("entry_page", entryPage),
     breakdownStatement("source_group", sourceGroup),
   ]);
-  return json({ ok: true }, 202, request, env);
+  return json(
+    {
+      ok: true,
+      deduplicated: Number(results[0]?.meta?.changes || 0) === 0,
+    },
+    202,
+    request,
+    env,
+  );
 }
 
 function emptyFunnelCounts() {
@@ -2881,6 +2917,9 @@ async function cleanupJournals(env) {
     env.LEADS.prepare(
       `DELETE FROM funnel_breakdowns_daily WHERE event_date<?`,
     ).bind(funnelCutoff),
+    env.LEADS.prepare(
+      `DELETE FROM funnel_event_uniques WHERE created_at<?`,
+    ).bind(uniqueCutoff),
     env.LEADS.prepare(
       `DELETE FROM site_pageviews_daily WHERE event_date<?`,
     ).bind(funnelCutoff),

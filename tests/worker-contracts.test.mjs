@@ -106,12 +106,16 @@ function funnelRequest({
   entryPage = "instrument",
   sourceGroup = "google",
   origin = allowedOrigin,
+  ip = "203.0.113.20",
+  userAgent = "Funnel Test Browser/1.0",
 } = {}) {
   return new Request("https://api.example.test/api/funnel", {
     method: "POST",
     headers: {
       Origin: origin,
       "Content-Type": "application/json",
+      "X-Forwarded-For": ip,
+      "User-Agent": userAgent,
     },
     body: JSON.stringify({
       event,
@@ -261,13 +265,17 @@ test("site analytics counts pageviews and daily visitors without raw identifiers
 test("funnel tracking stores only validated aggregate counters", async () => {
   const env = environment();
   try {
-    for (const request of [
+    const trackedRequests = [
       funnelRequest(),
       funnelRequest(),
+      funnelRequest({ ip: "203.0.113.21" }),
       funnelRequest({ event: "contact_reached" }),
-    ]) {
+    ];
+    for (const [index, request] of trackedRequests.entries()) {
       const response = await worker.fetch(request, env, context());
       assert.equal(response.status, 202);
+      const payload = await response.json();
+      assert.equal(payload.deduplicated, index === 1);
     }
 
     const invalid = await worker.fetch(
@@ -322,6 +330,14 @@ test("funnel tracking stores only validated aggregate counters", async () => {
         event_count: 2,
       },
     ]);
+
+    assert.equal(
+      env.LEADS.database
+        .prepare("SELECT COUNT(*) AS count FROM funnel_event_uniques")
+        .get().count,
+      3,
+      "a reload must not create a second counter for the same daily visitor and step",
+    );
 
     const breakdownRows = env.LEADS.database
       .prepare(

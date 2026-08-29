@@ -277,6 +277,7 @@ test("final defaults, required fields, uniqueness and named indexes are explicit
       "api_rate_limits",
       "funnel_breakdowns_daily",
       "funnel_daily",
+      "funnel_event_uniques",
       "lead_continuations",
       "leads",
       "object_deletions",
@@ -290,6 +291,7 @@ test("final defaults, required fields, uniqueness and named indexes are explicit
       [
         "idx_funnel_breakdowns_event",
         "idx_funnel_daily_event",
+        "idx_funnel_event_uniques_created",
         "idx_lead_continuations_status",
         "idx_leads_class",
         "idx_leads_created",
