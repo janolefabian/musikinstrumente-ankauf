@@ -1,0 +1,64 @@
+---
+const { entryPath, type = 'unknown', city = '', heading = 'Sie möchten Ihr Instrument verkaufen?' } = Astro.props;
+const apiBase = import.meta.env.PUBLIC_API_BASE || '';
+const offerUrl = `/instrument-verkaufen/?${new URLSearchParams({ ...(type !== 'unknown' ? { type } : {}), ...(city ? { city } : {}) })}`;
+---
+<section class="quick-inquiry" data-quick-inquiry data-api-base={apiBase} data-entry-path={entryPath} data-type={type} aria-labelledby="quick-inquiry-heading">
+  <div data-quick-intro>
+    <h2 id="quick-inquiry-heading">{heading}</h2>
+    <p>Ein Foto hilft uns bei der ersten Einschätzung. Wenn Sie gerade keines zur Hand haben, können Sie uns zunächst kurz schreiben. Hersteller und Baujahr müssen Sie nicht kennen.</p>
+    <div class="quick-actions">
+      <a class="button primary" href={offerUrl}>Instrument mit Fotos anbieten</a>
+      <button class="button secondary" type="button" data-quick-open aria-expanded="false" aria-controls="quick-inquiry-form" hidden>Erst einmal Kontakt aufnehmen</button>
+    </div>
+  </div>
+  <form id="quick-inquiry-form" data-quick-form hidden>
+    <div class="field"><label for="quick-story">Was möchten Sie anbieten?</label><textarea id="quick-story" name="story" rows="3" maxlength="1500" required placeholder="Zum Beispiel: Ein älterer Kontrabass aus einem Nachlass."></textarea></div>
+    <div class="field"><label for="quick-contact">E-Mail oder Telefonnummer</label><input id="quick-contact" name="contact" type="text" maxlength="254" required spellcheck="false" autocapitalize="off" aria-describedby="quick-contact-help" /><p class="mini-note" id="quick-contact-help">Eine Kontaktmöglichkeit genügt. Bei einer Telefonnummer bitte die Vorwahl angeben.</p></div>
+    <div class="field"><label for="quick-name">Name <span class="optional">freiwillig</span></label><input id="quick-name" name="name" maxlength="160" autocomplete="name" /></div>
+    <div class="quick-honeypot" aria-hidden="true"><label>Website<input name="website" type="text" tabindex="-1" autocomplete="off" /></label></div>
+    <p class="mini-note">Wir verwenden Ihre Angaben, um Ihre Anfrage zu bearbeiten und Ihnen zu antworten. <a href="/datenschutz/" target="_blank" rel="noopener">Datenschutzerklärung</a></p>
+    <button class="button primary" type="submit" data-quick-submit>Kontaktanfrage senden</button>
+  </form>
+  <p data-quick-status role="status" aria-live="polite"></p>
+  <div data-quick-success hidden tabindex="-1">
+    <h3>Ihre Nachricht ist angekommen.</h3>
+    <p>Wir sehen uns Ihre Anfrage persönlich an. Möchten Sie bereits ein Foto ergänzen?</p>
+    <div data-quick-upload-area>
+      <label class="button secondary quick-upload-label">Fotos auswählen<input type="file" accept="image/*" multiple data-quick-photos /></label>
+      <p class="mini-note">Freiwillig: bis zu fünf Fotos, jeweils bis 20 MB. Die Anfrage ist auch ohne Fotos gespeichert.</p>
+      <p class="mini-note">Ergänzte Fotos und Ihre Beschreibung können für die interne Vorsortierung an OpenAI übermittelt werden. Die Ankaufentscheidung erfolgt persönlich. <a href="/datenschutz/" target="_blank" rel="noopener">Datenschutz</a></p>
+    </div>
+    <p data-quick-photo-status role="status" aria-live="polite"></p>
+    <button class="button secondary" type="button" data-quick-upload hidden>Ausgewählte Fotos senden</button>
+    <button class="quick-text-button" type="button" data-quick-new>Eine weitere Anfrage stellen</button>
+  </div>
+  <noscript><p>Sie können uns auch eine <a href="mailto:kontakt@musikinstrument-ankauf.de">E-Mail schreiben</a>.</p></noscript>
+</section>
+<script type="module" src="/js/quick-inquiry.js?v=20260905-1" is:inline></script>
+<style>
+  .quick-inquiry { margin: 1.75rem 0; padding: clamp(1.25rem, 3vw, 2rem); background: #edf4f2; border: 1px solid #c4d9d5; border-radius: .6rem; color: #202522; }
+  .quick-inquiry h2 { font-size: clamp(1.4rem, 2.8vw, 1.9rem); margin: 0 0 .75rem; }
+  .quick-inquiry p { margin: .6rem 0 1rem; }
+  .quick-actions { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; }
+  .quick-inquiry .button { font: inherit; font-size: 1rem; cursor: pointer; text-align: center; }
+  .quick-inquiry .primary { background: var(--accent); color: white; }
+  .quick-inquiry .primary:hover { background: var(--accent-dark); }
+  .quick-inquiry .secondary { background: white; color: var(--accent-dark); border-color: var(--accent); }
+  .quick-inquiry .button:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+  .quick-inquiry button:disabled { opacity: .65; cursor: wait; }
+  .quick-inquiry form { margin-top: 1.5rem; max-width: 38rem; }
+  .quick-inquiry input:not([type=file]), .quick-inquiry textarea { box-sizing: border-box; width: 100%; min-height: 2.75rem; padding: .75rem; border: 1px solid #80918c; border-radius: .3rem; background: white; font: inherit; font-size: 1rem; }
+  .quick-inquiry label { display: block; margin-bottom: .35rem; }
+  .quick-inquiry .field { margin-bottom: 1rem; }
+  .quick-inquiry .mini-note { font-size: .875rem; line-height: 1.5; }
+  .quick-inquiry [role=status]:empty { display: none; }
+  .quick-inquiry [data-error=true] { color: #8e2424; }
+  .quick-inquiry [hidden] { display: none !important; }
+  .quick-honeypot { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .quick-upload-label { position: relative; display: inline-block !important; overflow: hidden; }
+  .quick-upload-label input { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; }
+  .quick-upload-label:focus-within { outline: 3px solid #0d7377; outline-offset: 3px; }
+  .quick-text-button { display: block; margin-top: 1.5rem; padding: .4rem 0; background: transparent; border: 0; text-decoration: underline; font: inherit; font-size: .875rem; cursor: pointer; }
+  @media (max-width: 600px) { .quick-actions > *, .quick-inquiry [data-quick-submit] { width: 100%; } }
+</style>

@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import QuickInquiry from '../../components/QuickInquiry.astro';
 import { site } from '../../config/site';
 
 const title = 'Albert-Volkmann-Kontrabass von 1908 – eine Geschichte aus Feuer und Lack';
@@ -54,6 +55,7 @@ const structuredData = {
           <span><strong>Jahr</strong> 1908</span>
           <span><strong>Ort</strong> Schönbach</span>
         </div>
+        <QuickInquiry entryPath={canonical} type="double_bass" heading="Sie besitzen ebenfalls einen älteren Kontrabass?" />
       </div>
       <picture class="story-hero-media">
         <source

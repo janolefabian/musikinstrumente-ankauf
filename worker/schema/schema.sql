@@ -30,7 +30,17 @@ CREATE TABLE IF NOT EXISTS leads (
   consent_at TEXT,
   consent_version TEXT,
   deleted_at TEXT,
-  deletion_status TEXT NOT NULL DEFAULT ''
+  deletion_status TEXT NOT NULL DEFAULT '',
+  inquiry_kind TEXT NOT NULL DEFAULT 'photo',
+  entry_path TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE quick_inquiry_daily (
+  event_date TEXT NOT NULL,
+  entry_path TEXT NOT NULL,
+  event_name TEXT NOT NULL CHECK (event_name IN ('opened', 'sent')),
+  event_count INTEGER NOT NULL DEFAULT 0 CHECK (event_count >= 0),
+  PRIMARY KEY (event_date, entry_path, event_name)
 );
 
 CREATE TABLE IF NOT EXISTS photos (

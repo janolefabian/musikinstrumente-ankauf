@@ -92,6 +92,12 @@ const apiBase = import.meta.env.PUBLIC_API_BASE || '';
         <div class="analysis-hours" data-analysis-hours></div>
       </section>
 
+      <section class="analysis-card" aria-labelledby="quick-analysis-title">
+        <div class="analysis-card-head"><div><h2 id="quick-analysis-title">Kurzanfragen ohne Pflichtfoto</h2><p>Separat vom Foto-Assistenten · ab 5. September 2026</p></div></div>
+        <div class="analysis-list" data-quick-analysis></div>
+        <p class="mini-note">Öffnungen werden pro Tag, Einstiegsseite und Besucher-Prüfwert höchstens einmal gezählt; Datenschutzeinstellungen werden beachtet. Gesendet zählt tatsächlich gespeicherte Kurzanfragen, auch wenn später Fotos ergänzt oder Anfragen gelöscht werden. Wiederholtes Senden derselben Anfrage zählt nicht doppelt. Die beiden Zähler sind keine exakte Abbruchquote.</p>
+      </section>
+
       <section class="review-funnel analysis-funnel" data-funnel-panel aria-labelledby="review-funnel-title">
         <div class="review-funnel-header">
           <div>
@@ -126,5 +132,5 @@ const apiBase = import.meta.env.PUBLIC_API_BASE || '';
       </aside>
     </div>
   </section>
-  <script src="/js/analysis.js?v=20260829-1" is:inline></script>
+  <script src="/js/analysis.js?v=20260905-1" is:inline></script>
 </BaseLayout>

@@ -1,5 +1,6 @@
 ---
 import { stories } from '../data/stories';
+import QuickInquiry from './QuickInquiry.astro';
 
 const { city } = Astro.props;
 const offerUrl = `/instrument-verkaufen/?city=${encodeURIComponent(city.name)}`;
@@ -13,10 +14,10 @@ const cityStories = city.storyHrefs ? stories.filter((story) => city.storyHrefs.
         <p class="eyebrow">Deutschlandweiter Online-Ankauf · Region {city.name}</p>
         <h1>Musikinstrument aus {city.name} verkaufen</h1>
         <p class="city-page-lead">{city.intro}</p>
-        <div class="city-page-actions">
+        {city.slug === 'stuttgart' ? <QuickInquiry entryPath="/stuttgart/" city="Stuttgart" /> : <div class="city-page-actions">
           <a class="button city-primary" href={offerUrl}>Instrument aus {city.name} anbieten</a>
           <a class="city-text-link" href="#ablauf">Erst den Ablauf ansehen</a>
-        </div>
+        </div>}
       </div>
       <aside class="city-trust-card" aria-label="Das Wichtigste zur Anfrage">
         <p class="eyebrow">Der sichere erste Schritt</p>

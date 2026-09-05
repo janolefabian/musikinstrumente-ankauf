@@ -2941,3 +2941,4 @@ kbd {
     border-radius: 0;
   }
 }
+.quick-lead-placeholder { display: grid; place-items: center; background: #edf4f2; color: #0d7377; font-size: 2rem; border: 1px solid #c4d9d5; }

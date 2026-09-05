@@ -493,7 +493,16 @@ function legacySubmissionAllowed(env) {
   );
 }
 
-function normalizeInitialMeta(raw, created, { allowLegacy = false } = {}) {
+const QUICK_ENTRY_PAGES = new Map([
+  ["/stuttgart/", { type: "unknown", city: "Stuttgart" }],
+  ["/kontrabass-verkaufen/", { type: "double_bass", city: "" }],
+  ["/instrumentengeschichten/albert-volkmann-1908/", { type: "double_bass", city: "" }],
+]);
+
+function normalizeInitialMeta(raw, created, { allowLegacy = false, quick = false } = {}) {
+  const quickPage = quick ? QUICK_ENTRY_PAGES.get(raw.entry_path) : null;
+  if (quick && !quickPage) apiError(400, "entry_path_invalid");
+  if (quick) raw = { ...raw, type: quickPage.type, classifiedType: quickPage.type };
   const type = boundedText(raw.type, 40, "type", { required: true });
   if (!ALLOWED_INSTRUMENT_TYPES.has(type)) apiError(400, "type_invalid");
   const classifiedType = boundedText(
@@ -504,12 +513,25 @@ function normalizeInitialMeta(raw, created, { allowLegacy = false } = {}) {
   if (classifiedType && !ALLOWED_INSTRUMENT_TYPES.has(classifiedType))
     apiError(400, "classified_type_invalid");
   const data = raw.data && typeof raw.data === "object" ? raw.data : {};
-  const email = boundedText(data.email, 320, "email", { required: true });
-  if (!validEmail(email)) apiError(400, "email_invalid");
+  let email = boundedText(data.email, 320, "email", { required: !quick });
+  let phone = boundedText(data.phone, 80, "phone");
+  if (quick) {
+    if (boundedText(data.website, 500, "website")) apiError(400, "request_invalid");
+    const contact = boundedText(data.contact, 254, "contact", { required: true });
+    const digits = contact.replace(/\D/g, "");
+    if (validEmail(contact)) { email = contact; phone = ""; }
+    else if (/^\+?[\d\s()./-]+$/u.test(contact) && digits.length >= 7 && digits.length <= 18) {
+      phone = contact; email = "";
+    } else apiError(400, "contact_invalid");
+  } else if (!validEmail(email)) apiError(400, "email_invalid");
 
   let consentAt;
   let consentVersion;
-  if (allowLegacy && raw.consent === undefined) {
+  if (quick) {
+    // Records a visitor-requested reply, not a checkbox consent that was never given.
+    consentAt = created;
+    consentVersion = "contact-request-2026-09-05";
+  } else if (allowLegacy && raw.consent === undefined) {
     consentAt = created;
     consentVersion = "legacy-ui-implicit-v1";
   } else {
@@ -538,12 +560,14 @@ function normalizeInitialMeta(raw, created, { allowLegacy = false } = {}) {
   return {
     type,
     classifiedType,
+    inquiryKind: quick ? "quick" : "photo",
+    entryPath: quick ? raw.entry_path : "",
     data: {
       name: boundedText(data.name, 200, "name"),
       email,
-      phone: boundedText(data.phone, 80, "phone"),
-      city: boundedText(data.city, 200, "city"),
-      story: boundedText(data.story, 10000, "story"),
+      phone,
+      city: quick ? quickPage.city : boundedText(data.city, 200, "city"),
+      story: boundedText(data.story, quick ? 1500 : 10000, "story", { required: quick }),
       maker: boundedText(data.maker, 1000, "maker"),
     },
     photoMeta: raw.photoMeta,
@@ -1263,6 +1287,8 @@ function makePayload(env, leadId, created, meta, ai, photoCount) {
     id: leadId,
     created_at: created,
     instrument_type: meta.type || "",
+    inquiry_kind: meta.inquiryKind || "photo",
+    entry_path: meta.entryPath || "",
     classified_type: meta.classifiedType || "",
     ai_used: ai.analysis_source === "openai",
     title: ai.title || effectiveType(meta),
@@ -1319,27 +1345,29 @@ async function notifyMake(env, payload) {
   }
 }
 
-async function createLead(request, env, ctx) {
+async function createLead(request, env, ctx, { quick = false } = {}) {
   requirePublicWriteOrigin(request, env);
   await enforceRateLimit(request, env, "lead-create", 5, 60 * 60);
   const clientKey = (request.headers.get("Idempotency-Key") || "").trim();
   if (clientKey && !/^[A-Za-z0-9._:-]{16,128}$/u.test(clientKey))
     apiError(400, "idempotency_key_invalid");
-  const fd = await readMultipart(request, MAX_LEAD_REQUEST_BYTES);
+  const fd = await readMultipart(request, quick ? 24000 : MAX_LEAD_REQUEST_BYTES);
   const created = new Date().toISOString();
   const rawMeta = parseJsonField(fd);
   const allowLegacy =
     !clientKey && rawMeta.consent === undefined && legacySubmissionAllowed(env);
   if (!clientKey && !allowLegacy)
     apiError(400, "idempotency_key_missing");
-  const meta = normalizeInitialMeta(rawMeta, created, { allowLegacy });
+  const meta = normalizeInitialMeta(rawMeta, created, { allowLegacy, quick });
   const files = sortedFiles(fd, "photo_");
   const thumbnailFiles = sortedFiles(fd, "thumb_");
   const aiFiles = sortedFiles(fd, "ai_");
+  if (quick && (files.length || thumbnailFiles.length || aiFiles.length))
+    apiError(400, "quick_photos_not_allowed");
   await validatePhotoBundle(files, thumbnailFiles, aiFiles);
   const photoMeta = normalizePhotoMeta(meta.photoMeta, files.length);
   const idempotencyHash = clientKey
-    ? await sha256(clientKey)
+    ? await sha256(quick ? `quick\n${clientKey}` : clientKey)
     : await legacyInitialOperationHash(
         request,
         { ...meta, photoMeta },
@@ -1375,6 +1403,7 @@ async function createLead(request, env, ctx) {
     );
   };
   if (existing) {
+    if (existing.deleted_at) apiError(410, "lead_deleted");
     const updatedAt = Date.parse(
       existing.processing_updated_at || existing.created_at || "",
     );
@@ -1418,13 +1447,13 @@ async function createLead(request, env, ctx) {
   const leadId = existing?.id || id();
   const fallback = fallbackAnalysis(meta, "pending");
   if (!existing) try {
-    await env.LEADS.prepare(
+    const insertLead = env.LEADS.prepare(
       `INSERT INTO leads (
         id,created_at,type,classified_type,name,email,phone,city,story,maker,
         lead_class,interest_score,confidence,notable,summary,ai_json,photo_count,
         make_status,idempotency_key_hash,processing_status,processing_error,
-        processing_updated_at,consent_at,consent_version
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        processing_updated_at,consent_at,consent_version,inquiry_kind,entry_path
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     )
       .bind(
         leadId,
@@ -1451,8 +1480,17 @@ async function createLead(request, env, ctx) {
         created,
         meta.consentAt,
         meta.consentVersion,
-      )
-      .run();
+        meta.inquiryKind,
+        meta.entryPath,
+      );
+    if (quick) {
+      // Lead and business counter commit together; retries cannot count twice.
+      await env.LEADS.batch([insertLead, env.LEADS.prepare(
+        `INSERT INTO quick_inquiry_daily (event_date,entry_path,event_name,event_count)
+         VALUES (?,?,'sent',1)
+         ON CONFLICT(event_date,entry_path,event_name) DO UPDATE SET event_count=event_count+1`,
+      ).bind(berlinDateParts(new Date(created)).date, meta.entryPath)]);
+    } else await insertLead.run();
   } catch (error) {
     existing = await env.LEADS.prepare(
       `SELECT * FROM leads WHERE idempotency_key_hash=?`,
@@ -1485,7 +1523,12 @@ async function createLead(request, env, ctx) {
     let ai;
     let analysisError = "";
     try {
-      ai = await analyzeLead(env, meta, small);
+      ai = quick ? {
+        lead_class: "B", interest_score: 0, confidence: 0, notable: false,
+        title: "Kurzanfrage zum Instrumentenankauf",
+        summary: "Kurzanfrage – noch ohne Fotos. Bitte persönlich Kontakt aufnehmen.",
+        signals: [], analysis_source: "contact_request",
+      } : await analyzeLead(env, meta, small);
     } catch (error) {
       console.error("Lead analysis failed", leadId, error);
       analysisError = `ai_failed: ${String(error).slice(0, 900)}`;
@@ -2033,6 +2076,38 @@ async function recordSitePageview(request, env) {
   return json({ ok: true }, 202, request, env);
 }
 
+async function recordQuickInquiryOpen(request, env) {
+  requirePublicWriteOrigin(request, env);
+  assertContentLength(request, 2048);
+  if (isLikelyBot(request) || request.headers.get("DNT") === "1" || request.headers.get("Sec-GPC") === "1")
+    return json({ ok: true }, 202, request, env);
+  await enforceRateLimit(request, env, "quick-inquiry-open", 60, 10 * 60);
+  if (!(request.headers.get("Content-Type") || "").startsWith("application/json"))
+    apiError(415, "json_required");
+  const body = await request.json().catch(() => null);
+  const entry = body?.entry_path;
+  if (!QUICK_ENTRY_PAGES.has(entry)) apiError(400, "entry_path_invalid");
+  const now = new Date();
+  const date = berlinDateParts(now).date;
+  const visitor = await analyticsVisitorHash(request, env, date);
+  if (!visitor) apiError(503, "analytics_not_configured");
+  const event = `quick-open:${entry}`;
+  const claim = crypto.randomUUID();
+  const results = await env.LEADS.batch([
+    env.LEADS.prepare(
+      `INSERT OR IGNORE INTO funnel_event_uniques
+       (event_date,event_name,visitor_hash,claim_token,created_at) VALUES (?,?,?,?,?)`,
+    ).bind(date, event, visitor, claim, now.toISOString()),
+    env.LEADS.prepare(
+      `INSERT INTO quick_inquiry_daily (event_date,entry_path,event_name,event_count)
+       SELECT ?,?,'opened',1 FROM funnel_event_uniques
+       WHERE event_date=? AND event_name=? AND visitor_hash=? AND claim_token=?
+       ON CONFLICT(event_date,entry_path,event_name) DO UPDATE SET event_count=event_count+1`,
+    ).bind(date, entry, date, event, visitor, claim),
+  ]);
+  return json({ ok: true, deduplicated: !Number(results[0]?.meta?.changes || 0) }, 202, request, env);
+}
+
 async function recordFunnelEvent(request, env) {
   requirePublicWriteOrigin(request, env);
   assertContentLength(request, 2048);
@@ -2275,6 +2350,7 @@ async function reviewSiteAnalytics(request, env) {
     visitorCountriesResult,
     hoursResult,
     groupsResult,
+    quickResult,
   ] = await Promise.all([
     query(
       `SELECT event_date,SUM(view_count) AS count
@@ -2342,6 +2418,10 @@ async function reviewSiteAnalytics(request, env) {
        FROM site_pageviews_daily WHERE event_date>=? AND event_date<=?
        GROUP BY page_group ORDER BY views DESC`,
     ),
+    query(
+      `SELECT event_date,entry_path,event_name,event_count FROM quick_inquiry_daily
+       WHERE event_date>=? AND event_date<=? ORDER BY event_date,entry_path,event_name`,
+    ),
   ]);
 
   const dateMap = new Map();
@@ -2360,6 +2440,13 @@ async function reviewSiteAnalytics(request, env) {
   for (const row of leadsByDayResult.results || [])
     if (dateMap.has(row.event_date))
       dateMap.get(row.event_date).leads = Number(row.count || 0);
+  const quickByPage = Object.fromEntries([...QUICK_ENTRY_PAGES.keys()].map((path) => [path, { path, opened: 0, sent: 0 }]));
+  for (const row of quickResult.results || []) {
+    if (!quickByPage[row.entry_path] || !["opened", "sent"].includes(row.event_name)) continue;
+    quickByPage[row.entry_path][row.event_name] += Number(row.event_count || 0);
+    if (row.event_name === "sent" && dateMap.has(row.event_date))
+      dateMap.get(row.event_date).leads += Number(row.event_count || 0);
+  }
   const timeline = [...dateMap.values()];
   const totals = timeline.reduce(
     (sum, row) => ({
@@ -2375,6 +2462,7 @@ async function reviewSiteAnalytics(request, env) {
       range: { days, from, to },
       totals,
       timeline,
+      quick_inquiries: Object.values(quickByPage),
       pages: (pagesResult.results || []).map((row) => ({
         path: row.page_path,
         group: row.page_group,
@@ -2518,7 +2606,7 @@ async function reviewList(request, env) {
         l.id, l.created_at, l.type, l.classified_type, l.name, l.email,
         l.phone, l.maker, l.city, l.summary, l.lead_class,
         l.interest_score, l.confidence, l.notable, l.status,
-        l.make_status, l.photo_count, l.ai_json
+        l.make_status, l.photo_count, l.ai_json, l.inquiry_kind, l.entry_path
       FROM leads l
       ${where}
     ),
@@ -2589,6 +2677,8 @@ async function reviewList(request, env) {
       status: l.status,
       make_status: l.make_status,
       photo_count: l.photo_count,
+      inquiry_kind: l.inquiry_kind,
+      entry_path: l.entry_path,
       created_at: l.created_at,
       image: thumbnail,
       thumbnail,
@@ -2913,6 +3003,9 @@ async function cleanupJournals(env) {
     ).bind(cutoff),
     env.LEADS.prepare(
       `DELETE FROM funnel_daily WHERE event_date<?`,
+    ).bind(funnelCutoff),
+    env.LEADS.prepare(
+      `DELETE FROM quick_inquiry_daily WHERE event_date<?`,
     ).bind(funnelCutoff),
     env.LEADS.prepare(
       `DELETE FROM funnel_breakdowns_daily WHERE event_date<?`,
@@ -3245,6 +3338,10 @@ export default {
         return await recordSitePageview(request, env);
       if (url.pathname === "/api/leads" && request.method === "POST")
         return await createLead(request, env, ctx);
+      if (url.pathname === "/api/quick-inquiries" && request.method === "POST")
+        return await createLead(request, env, ctx, { quick: true });
+      if (url.pathname === "/api/analytics/quick-inquiry" && request.method === "POST")
+        return await recordQuickInquiryOpen(request, env);
       const continuation = url.pathname.match(/^\/api\/leads\/([^/]+)\/continue$/);
       if (continuation && request.method === "POST")
         return await continueLead(

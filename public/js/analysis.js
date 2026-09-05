@@ -281,6 +281,11 @@
     periodEl.textContent = `${dateLabel(range.from, { day: "2-digit", month: "2-digit", year: "numeric" })} bis ${dateLabel(range.to, { day: "2-digit", month: "2-digit", year: "numeric" })}`;
     renderKpis(payload);
     renderTimeline(payload);
+    const quickRows = payload.quick_inquiries || [];
+    const quickPanel = root.querySelector("[data-quick-analysis]");
+    if (quickPanel) quickPanel.innerHTML = quickRows.length ? quickRows.map((row) =>
+      `<div class="review-funnel-breakdown-row"><strong>${esc(pathLabel(row.path))}</strong><span>${number.format(count(row.opened))} geöffnet · ${number.format(count(row.sent))} gesendet</span></div>`,
+    ).join("") : '<p class="analysis-empty">Noch keine Kurzanfrage-Daten verfügbar.</p>';
     renderList(pagesEl, payload.pages || [], {
       label: (row) => pathLabel(row.path),
       detail: (row) => `${number.format(row.views)} Aufrufe · ${row.path}`,

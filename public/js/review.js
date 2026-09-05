@@ -482,28 +482,30 @@
       leads
         .map((lead) => {
           const thumbnail = lead.thumbnail || lead.image || fallbackImage;
+          const quickWithoutPhotos = lead.inquiry_kind === "quick" && !lead.photo_count;
           return `
             <div class="lead-row${lead.id === selectedId ? " selected" : ""}${selectedLeadIds.has(lead.id) ? " bulk-selected" : ""}" data-lead-row="${esc(lead.id)}">
               <label class="lead-select" title="Anfrage auswählen">
                 <input type="checkbox" data-select-lead value="${esc(lead.id)}" aria-label="${esc(lead.title || "Anfrage")} auswählen" ${selectedLeadIds.has(lead.id) ? "checked" : ""}>
               </label>
               <button class="lead-row-open" data-open="${esc(lead.id)}" type="button">
-                <span class="lead-thumb protected-image-shell is-loading">
+                ${quickWithoutPhotos ? '<span class="lead-thumb quick-lead-placeholder" aria-label="Kurzanfrage ohne Foto">✉</span>' : `<span class="lead-thumb protected-image-shell is-loading">
                   <img data-protected-image="${esc(thumbnail)}" alt="Vorschaubild der Anfrage" width="92" height="92">
-                </span>
+                </span>`}
                 <div class="lead-row-body">
                   <div class="lead-row-top">
                     <div class="lead-badges">
                       <span class="badge ${lead.class === "A" ? "hot" : ""}">${esc(lead.class || "?")}</span>
                       ${lead.notable ? '<span class="badge notable">Auffällig</span>' : ""}
-                      ${confidenceBadge(lead.confidence)}
+                      ${lead.inquiry_kind === "quick" ? `<span class="badge status-badge">Kurzanfrage${quickWithoutPhotos ? " – noch ohne Fotos" : " – Fotos ergänzt"}</span>` : ""}
+                      ${quickWithoutPhotos ? "" : confidenceBadge(lead.confidence)}
                     </div>
                     <time>${esc(fmtDate(lead.created_at))}</time>
                   </div>
                   <h3>${esc(lead.title || "Anfrage")}</h3>
                   <p class="lead-meta">${esc(lead.city || "Ort unbekannt")}${lead.name ? ` · ${esc(lead.name)}` : ""}</p>
                   <p class="lead-row-summary">${esc(lead.summary || "")}</p>
-                  <div class="lead-row-footer"><span>${esc(statusLabel(lead.status))}</span><span>${esc(lead.photo_count ?? "")}${lead.photo_count != null ? " Fotos" : ""}</span><span>Interesse ${esc(lead.score ?? "?")}</span></div>
+                  <div class="lead-row-footer"><span>${esc(statusLabel(lead.status))}</span><span>${esc(lead.photo_count ?? "")}${lead.photo_count != null ? " Fotos" : ""}</span><span>${quickWithoutPhotos ? "Persönlich Kontakt aufnehmen" : `Interesse ${esc(lead.score ?? "?")}`}</span></div>
                 </div>
               </button>
             </div>`;
@@ -656,6 +658,7 @@
       const signals = lead.ai?.signals || [];
       const title = lead.ai?.title || lead.type || "Anfrage";
       const confidence = Number(lead.confidence);
+      const quickWithoutPhotos = lead.inquiry_kind === "quick" && !lead.photo_count;
 
       detailEl.innerHTML = `
         <div class="detail-top">
@@ -663,16 +666,16 @@
           <div class="lead-badges">
             <span class="badge ${lead.lead_class === "A" ? "hot" : ""}">${esc(lead.lead_class || "?")}</span>
             ${lead.notable ? '<span class="badge notable">Auffällig</span>' : ""}
-            ${confidenceBadge(confidence)}
-            <span class="badge">Interesse ${esc(lead.interest_score ?? "?")}</span>
-            <span class="badge">Sicherheit ${esc(lead.confidence ?? "?")}</span>
+            ${lead.inquiry_kind === "quick" ? `<span class="badge">Kurzanfrage${quickWithoutPhotos ? " – noch ohne Fotos" : " – Fotos ergänzt"}</span>` : ""}
+            ${quickWithoutPhotos ? "" : `${confidenceBadge(confidence)}<span class="badge">Interesse ${esc(lead.interest_score ?? "?")}</span><span class="badge">Sicherheit ${esc(lead.confidence ?? "?")}</span>`}
             <span class="badge status-badge">${esc(statusLabel(lead.status))}</span>
           </div>
         </div>
         <h2>${esc(title)}</h2>
         <p class="lead-meta">${esc(lead.city || "Ort unbekannt")} · ${esc(lead.id)} · ${esc(fmtDate(lead.created_at))}</p>
         ${lead.summary ? `<p class="detail-summary">${esc(lead.summary)}</p>` : ""}
-        ${Number.isFinite(confidence) && confidence < 50 ? '<div class="uncertainty-note"><strong>Manuell prüfen.</strong> Die automatische Einordnung ist hier unsicher.</div>' : ""}
+        ${lead.inquiry_kind === "quick" ? `<p class="lead-meta">Einstiegsseite: ${esc(lead.entry_path || "Unbekannt")}</p>` : ""}
+        ${!quickWithoutPhotos && Number.isFinite(confidence) && confidence < 50 ? '<div class="uncertainty-note"><strong>Manuell prüfen.</strong> Die automatische Einordnung ist hier unsicher.</div>' : ""}
 
         <div class="detail-gallery-header"><h3>Fotos</h3><span>${currentImages.length}</span></div>
         <div class="detail-grid">

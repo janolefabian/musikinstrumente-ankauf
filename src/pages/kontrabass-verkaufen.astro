@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import QuickInquiry from '../components/QuickInquiry.astro';
 ---
 <BaseLayout title="Kontrabass verkaufen – Fotos & persönliche Prüfung" description="Kontrabass unkompliziert verkaufen: Welche Fotos und Angaben helfen, was bei Schäden wichtig ist und wie die persönliche Prüfung abläuft.">
   <article class="content-page">
@@ -7,13 +8,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     <h1>Kontrabass verkaufen</h1>
     <p class="lead">Für eine erste Prüfung müssen Sie weder den Hersteller noch das Baujahr kennen. Einige aussagekräftige Fotos und das, was Sie über den Kontrabass wissen, reichen für den Anfang.</p>
 
-    <div class="content-cta">
-      <div>
-        <strong>Sie können direkt mit einer Gesamtaufnahme beginnen.</strong>
-        <span>Die Anfrage wird gespeichert und anschließend persönlich angesehen.</span>
-      </div>
-      <a class="button primary" href="/instrument-verkaufen/?type=double_bass">Kontrabass anbieten</a>
-    </div>
+    <QuickInquiry entryPath="/kontrabass-verkaufen/" type="double_bass" heading="Sie möchten Ihren Kontrabass verkaufen?" />
 
     <h2>Diese Fotos helfen bei der ersten Prüfung</h2>
     <p>Der Foto-Assistent führt Sie Schritt für Schritt durch die wichtigsten Ansichten. Sie müssen keine Fachbegriffe kennen und können Angaben überspringen, die Ihnen unbekannt sind.</p>
