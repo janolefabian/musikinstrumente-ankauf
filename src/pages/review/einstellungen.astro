@@ -1,0 +1,71 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+const apiBase = import.meta.env.PUBLIC_API_BASE || '';
+---
+<BaseLayout title="E-Mail-Benachrichtigungen – Musikinstrument Ankauf" robots="noindex,nofollow" analytics={false}>
+  <section class="review-page review-shell" data-email-settings data-api-base={apiBase}>
+    <section class="review-auth-gate" data-email-auth aria-labelledby="email-auth-title">
+      <div class="review-auth-state">
+        <p class="eyebrow">Interner Bereich</p>
+        <h1 id="email-auth-title">Einstellungen entsperren</h1>
+        <p>Verwenden Sie denselben Zugangsschlüssel wie für die Anfragen.</p>
+        <form data-email-login>
+          <label for="email-access-token">Zugangsschlüssel</label>
+          <input id="email-access-token" type="password" autocomplete="current-password" required data-email-token />
+          <button type="submit" data-email-login-submit>Einstellungen öffnen</button>
+          <p class="review-auth-error" data-email-auth-error role="alert"></p>
+        </form>
+      </div>
+    </section>
+    <div class="review-dashboard email-dashboard" data-email-dashboard hidden>
+      <nav class="review-area-nav" aria-label="Interner Bereich">
+        <a href="/review/">Anfragen</a>
+        <a href="/review/analyse/">Analyse</a>
+        <a href="/review/einstellungen/" aria-current="page">E-Mail-Benachrichtigungen</a>
+      </nav>
+      <div class="email-settings-content">
+        <p class="eyebrow">Einstellungen</p>
+        <h1>E-Mail-Benachrichtigungen</h1>
+        <p>Eine Nachricht bei neuen Anfragen – passend zu den ausgewählten Prioritäten.</p>
+        <p class="email-connection" data-email-connection role="status"></p>
+        <p>Empfänger: <strong data-email-recipient></strong></p>
+        <form data-email-preferences>
+          <fieldset>
+            <legend>Welche Prioritäten sollen eine E-Mail auslösen?</legend>
+            <label class="email-choice"><input type="checkbox" name="A" checked /><span><strong>A – Sofort</strong><small>Anfragen mit hoher Priorität.</small></span></label>
+            <label class="email-choice"><input type="checkbox" name="B" checked /><span><strong>B – Diese Woche</strong><small>Normale Anfragen, einschließlich Kurzanfragen ohne Fotos.</small></span></label>
+            <label class="email-choice"><input type="checkbox" name="C" checked /><span><strong>C – Weitere Anfragen</strong><small>Auch zunächst niedriger eingestufte Instrumente melden.</small></span></label>
+          </fieldset>
+          <p class="mini-note">Es zählt die Einstufung beim Eingang. „Auffällig“ ist eine zusätzliche Markierung und folgt der jeweiligen Priorität A, B oder C. Abgewählte Anfragen bleiben vollständig im Dashboard.</p>
+          <p class="mini-note">Die Auswahl gilt für neue Anfragen; sie versendet keine alten Anfragen nachträglich. Weitere Fotos oder ein erneutes Absenden derselben Anfrage lösen keine zweite E-Mail aus. Noch wartende Benachrichtigungen werden vor dem Versand erneut mit Ihrer Auswahl abgeglichen.</p>
+          <button type="submit" data-email-save>Einstellungen speichern</button>
+          <p data-email-save-status role="status" aria-live="polite"></p>
+        </form>
+        <section class="email-status-card" aria-labelledby="email-status-title">
+          <h2 id="email-status-title">Versandstatus</h2>
+          <p data-email-counts></p>
+          <p class="email-warning" data-email-warning hidden role="alert"></p>
+          <p class="mini-note">„Gesendet“ bedeutet, dass der Mail-Anbieter den Versand bestätigt hat – nicht, dass die Nachricht bereits im Posteingang liegt. Bei einem unklaren Versand wird nicht blind erneut gesendet; bitte den Make-Verlauf prüfen.</p>
+          <button type="button" class="ghost-button" data-email-refresh>Anzeige neu laden</button>
+        </section>
+      </div>
+    </div>
+  </section>
+  <script type="module" src="/js/email-settings.js?v=20260925-1" is:inline></script>
+</BaseLayout>
+<style>
+  [hidden] { display: none !important; }
+  .email-settings-content { max-width: 48rem; padding: clamp(1rem, 4vw, 3rem); margin: 0 auto; }
+  .email-settings-content h1 { font-size: clamp(2rem, 5vw, 3.3rem); }
+  fieldset { border: 0; padding: 0; margin: 1.8rem 0 1rem; }
+  legend { font-weight: bold; margin-bottom: 1rem; }
+  .email-choice { display: flex; align-items: start; gap: .8rem; padding: 1rem; margin: .5rem 0; border: 1px solid var(--line); border-radius: .5rem; background: white; cursor: pointer; }
+  .email-choice input { width: 1.3rem; height: 1.3rem; min-height: 0; margin: .15rem 0 0; accent-color: var(--accent); flex-shrink: 0; }
+  .email-choice small { display: block; margin-top: .25rem; }
+  .email-connection, .email-status-card { background: white; padding: 1rem; border: 1px solid var(--line); border-radius: .5rem; }
+  .email-status-card { margin-top: 2rem; }
+  .email-status-card h2 { font-size: 1.4rem; }
+  .email-warning, [data-error=true] { color: #8e2424; }
+  button:disabled { opacity: .6; cursor: wait; }
+  .mini-note { font-size: .9rem; }
+</style>

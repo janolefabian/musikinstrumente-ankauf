@@ -275,6 +275,8 @@ test("final defaults, required fields, uniqueness and named indexes are explicit
     const snapshot = schemaSnapshot(database);
     assert.deepEqual(snapshot.tables, [
       "api_rate_limits",
+      "email_notification_outbox",
+      "email_notification_settings",
       "funnel_breakdowns_daily",
       "funnel_daily",
       "funnel_event_uniques",
@@ -290,6 +292,7 @@ test("final defaults, required fields, uniqueness and named indexes are explicit
     assert.deepEqual(
       snapshot.indexes.map(({ name }) => name),
       [
+        "idx_email_outbox_due",
         "idx_funnel_breakdowns_event",
         "idx_funnel_daily_event",
         "idx_funnel_event_uniques_created",
@@ -319,6 +322,12 @@ test("final defaults, required fields, uniqueness and named indexes are explicit
     );
     assert.deepEqual(defaults, {
       "api_rate_limits.count": "0",
+      "email_notification_outbox.attempts": "0",
+      "email_notification_outbox.last_error": "''",
+      "email_notification_settings.notify_a": "1",
+      "email_notification_settings.notify_b": "1",
+      "email_notification_settings.notify_c": "1",
+      "email_notification_settings.revision": "0",
       "funnel_breakdowns_daily.event_count": "0",
       "funnel_breakdowns_daily.instrument_type": "'unselected'",
       "funnel_daily.device_type": "'unknown'",

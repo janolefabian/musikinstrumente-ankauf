@@ -1,4 +1,6 @@
 import { PHOTO_PROMPT, LEAD_PROMPT } from "./prompt.js";
+import { emailEnqueueStatement, dispatchEmails, emailSettings, saveEmailSettings,
+  readEmailJson, emailCallbackAuthorized, claimEmail, completeEmail } from "./email-notifications.js";
 
 const DEFAULT_ALLOWED_ORIGINS = [
   "http://localhost:4321",
@@ -1544,7 +1546,7 @@ async function createLead(request, env, ctx, { quick = false } = {}) {
       .filter(Boolean)
       .join("; ")
       .slice(0, 1000);
-    const updated = await env.LEADS.prepare(
+    const finishLead = env.LEADS.prepare(
       `UPDATE leads SET
         lead_class=?,interest_score=?,confidence=?,notable=?,summary=?,ai_json=?,
         photo_count=?,processing_status=?,processing_error=?,processing_updated_at=?
@@ -1562,8 +1564,11 @@ async function createLead(request, env, ctx, { quick = false } = {}) {
         processingError,
         new Date().toISOString(),
         leadId,
-      )
-      .run();
+      );
+    const [updated] = await env.LEADS.batch([
+      finishLead,
+      emailEnqueueStatement(env, leadId),
+    ]);
     if (!Number(updated.meta?.changes || 0)) apiError(410, "lead_deleted");
     if (photoFailure)
       return json(
@@ -1581,6 +1586,13 @@ async function createLead(request, env, ctx, { quick = false } = {}) {
     const payload = makePayload(env, leadId, created, meta, ai, photoCount);
     if (ctx?.waitUntil) ctx.waitUntil(notifyMake(env, payload));
     else await notifyMake(env, payload);
+    const notifyEmail = dispatchEmails(env, { leadId }).catch(() => {
+      // The durable outbox is retried by the maintenance job; saving the lead
+      // must not fail just because its notification could not be handed off.
+      console.error("Email notification deferred to scheduled retry");
+    });
+    if (ctx?.waitUntil) ctx.waitUntil(notifyEmail);
+    else await notifyEmail;
     return responseFor(
       {
         id: leadId,
@@ -3029,6 +3041,7 @@ async function runScheduledMaintenance(env) {
   await recoverStaleTombstoneUploads(env);
   await retryPendingDeletions(env);
   await cleanupJournals(env);
+  await dispatchEmails(env);
 }
 
 async function deleteLeadsByIds(env, leadIds) {
@@ -3351,6 +3364,23 @@ export default {
         );
       if (url.pathname === "/api/review" && request.method === "GET")
         return await reviewList(request, env);
+      if (url.pathname === "/api/review/email-settings" && ["GET", "PUT"].includes(request.method)) {
+        if (!authorized(request, env)) return reviewAuthError(request, env);
+        if (request.method === "GET") return json(await emailSettings(env), 200, request, env);
+        requirePublicWriteOrigin(request, env);
+        const input = await readEmailJson(request);
+        if (input.error) return json({ error: input.error }, input.status, request, env);
+        const result = await saveEmailSettings(env, input.value);
+        return json(result.body, result.status, request, env);
+      }
+      if (["/api/email-notifications/claim", "/api/email-notifications/complete"].includes(url.pathname) && request.method === "POST") {
+        if (!emailCallbackAuthorized(request, env)) return json({ error: "unauthorized" }, 401, request, env);
+        const input = await readEmailJson(request);
+        if (input.error) return json({ error: input.error }, input.status, request, env);
+        const result = url.pathname.endsWith("/claim")
+          ? await claimEmail(env, input.value) : await completeEmail(env, input.value);
+        return json(result.body, result.status, request, env);
+      }
       if (url.pathname === "/api/review/funnel" && request.method === "GET")
         return await reviewFunnel(request, env);
       if (

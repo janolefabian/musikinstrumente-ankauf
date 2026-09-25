@@ -1,5 +1,10 @@
 # Make + Ninox – schlanke Lead-Ablage
 
+**Neue optionale E-Mail-Einstellungen:** Die eigenständige
+Mail-Strecke mit A/B/C-Checkboxen ist in [email-notifications.md](email-notifications.md)
+beschrieben. Diese bestehende Ninox-/Make-Übergabe bleibt davon unabhängig. Nicht
+zusätzlich in beiden Strecken dieselben Benachrichtigungen aktivieren.
+
 Die Website speichert die schweren Daten nicht in Ninox:
 
 - **R2**: alle Originalfotos
