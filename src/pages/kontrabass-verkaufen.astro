@@ -2,13 +2,33 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import QuickInquiry from '../components/QuickInquiry.astro';
 ---
-<BaseLayout title="Kontrabass verkaufen – Fotos & persönliche Prüfung" description="Kontrabass unkompliziert verkaufen: Welche Fotos und Angaben helfen, was bei Schäden wichtig ist und wie die persönliche Prüfung abläuft.">
+<BaseLayout title="Kontrabass verkaufen – persönlicher Ankauf" description="Kontrabass verkaufen: Auch mit Schäden oder unbekannter Herkunft gerne anbieten. Wir sehen uns jeden angebotenen Bass persönlich an – ohne vorherige Reparatur.">
   <article class="content-page">
     <p class="eyebrow">Kontrabass</p>
-    <h1>Kontrabass verkaufen</h1>
-    <p class="lead">Für eine erste Prüfung müssen Sie weder den Hersteller noch das Baujahr kennen. Einige aussagekräftige Fotos und das, was Sie über den Kontrabass wissen, reichen für den Anfang.</p>
+    <h1>Sie möchten Ihren Kontrabass verkaufen?</h1>
+    <p class="lead">Ob regelmäßig gespielt, geerbt oder seit Jahren ungenutzt: Wir interessieren uns für Ihren Kontrabass. Auch Schäden, fehlende Teile oder eine unbekannte Herkunft sind kein Grund, auf eine Anfrage zu verzichten.</p>
 
-    <QuickInquiry entryPath="/kontrabass-verkaufen/" type="double_bass" heading="Sie möchten Ihren Kontrabass verkaufen?" />
+    <QuickInquiry
+      entryPath="/kontrabass-verkaufen/"
+      type="double_bass"
+      heading="Ihre Anfrage"
+      intro="Schicken Sie uns einige Fotos und erzählen Sie kurz, was Sie über das Instrument wissen. Wir sehen uns jeden angebotenen Bass persönlich an."
+      primaryLabel="Kontrabass zum Verkauf anbieten"
+      contactHint="Noch keine Fotos zur Hand? Über „Erst einmal Kontakt aufnehmen“ können Sie uns auch ohne Fotos schreiben."
+    />
+
+    <h2>Sie sind unsicher, ob sich eine Anfrage lohnt?</h2>
+    <p>Bieten Sie uns den Bass gerne an. Sie müssen weder den Hersteller noch das Baujahr kennen. Auch ein Instrument, das nicht mehr spielbar ist oder lange auf dem Dachboden stand, kann für uns interessant sein.</p>
+    <p>Vorherige Reparaturen oder eine besondere Reinigung sind nicht nötig. Zeigen Sie den Kontrabass einfach so, wie er gerade ist. Ein vorhandener Bogen darf ebenfalls mit angeboten werden.</p>
+
+    <h2>Wie kommen wir zu einem Angebot?</h2>
+    <p>Zunächst verschaffen wir uns anhand Ihrer Fotos und Angaben einen Eindruck vom Instrument. Fehlt eine wichtige Ansicht oder haben wir eine Rückfrage, melden wir uns bei Ihnen.</p>
+    <p>Nicht alles lässt sich auf Bildern beurteilen. Falls eine persönliche Begutachtung nötig ist, besprechen wir das mit Ihnen. Wenn ein Ankauf infrage kommt, erhalten Sie ein konkretes Angebot, über das Sie in Ruhe entscheiden können.</p>
+
+    <h2>Ein Beispiel aus unserem Bestand</h2>
+    <p>Beim Albert-Volkmann-Kontrabass von 1908 hatte starke Hitze den Lack deutlich verändert. Teile der Lackierung mussten später wiederhergestellt beziehungsweise erneuert werden.</p>
+    <p>Solche Spuren gehören zur Geschichte eines Instruments. Sie sind für uns ein Anlass, genauer hinzusehen – kein pauschaler Ausschlussgrund.</p>
+    <p><a href="/instrumentengeschichten/albert-volkmann-1908/">Die Geschichte dieses Kontrabasses ansehen</a></p>
 
     <h2>Diese Fotos helfen bei der ersten Prüfung</h2>
     <p>Der Foto-Assistent führt Sie Schritt für Schritt durch die wichtigsten Ansichten. Sie müssen keine Fachbegriffe kennen und können Angaben überspringen, die Ihnen unbekannt sind.</p>
@@ -24,17 +44,6 @@ import QuickInquiry from '../components/QuickInquiry.astro';
       <strong>Bitte nichts für das Foto verändern.</strong>
       <p>Reinigen Sie Etiketten nicht und versuchen Sie nicht, alte Reparaturen selbst auszubessern. Auch Staub, Gebrauchsspuren oder Schäden sind kein Grund, auf eine Anfrage zu verzichten.</p>
     </aside>
-
-    <h2>Auch ohne Herstellerangabe oder Rechnung</h2>
-    <p>Bei älteren Instrumenten sind Zettel und Bezeichnungen nicht immer eindeutig. Manchmal fehlen Unterlagen vollständig. Schreiben Sie deshalb lieber nur, was Sie sicher wissen: Woher stammt der Bass? Wer hat ihn gespielt? Seit wann befindet er sich in der Familie? Auch eine kurze Geschichte kann hilfreicher sein als eine Vermutung.</p>
-
-    <h2>So läuft die Anfrage ab</h2>
-    <ol class="process-list">
-      <li><strong>Übersichtsfoto aufnehmen</strong><span>Damit kann die Anfrage begonnen werden.</span></li>
-      <li><strong>Kontaktdaten zwischenspeichern</strong><span>Weitere Ansichten und Angaben können danach ergänzt werden.</span></li>
-      <li><strong>Persönliche Prüfung</strong><span>Die Fotos und Informationen werden nicht allein automatisch entschieden.</span></li>
-      <li><strong>Nächste Schritte abstimmen</strong><span>Wenn das Instrument grundsätzlich interessant ist, melden wir uns für Rückfragen.</span></li>
-    </ol>
 
     <section class="faq-section" aria-labelledby="bass-faq">
       <p class="eyebrow">Häufige Fragen</p>

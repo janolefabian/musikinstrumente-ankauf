@@ -1,16 +1,25 @@
 ---
-const { entryPath, type = 'unknown', city = '', heading = 'Sie möchten Ihr Instrument verkaufen?' } = Astro.props;
+const {
+  entryPath,
+  type = 'unknown',
+  city = '',
+  heading = 'Sie möchten Ihr Instrument verkaufen?',
+  intro = 'Ein Foto hilft uns bei der ersten Einschätzung. Wenn Sie gerade keines zur Hand haben, können Sie uns zunächst kurz schreiben. Hersteller und Baujahr müssen Sie nicht kennen.',
+  primaryLabel = 'Instrument mit Fotos anbieten',
+  contactHint = ''
+} = Astro.props;
 const apiBase = import.meta.env.PUBLIC_API_BASE || '';
 const offerUrl = `/instrument-verkaufen/?${new URLSearchParams({ ...(type !== 'unknown' ? { type } : {}), ...(city ? { city } : {}) })}`;
 ---
 <section class="quick-inquiry" data-quick-inquiry data-api-base={apiBase} data-entry-path={entryPath} data-type={type} aria-labelledby="quick-inquiry-heading">
   <div data-quick-intro>
     <h2 id="quick-inquiry-heading">{heading}</h2>
-    <p>Ein Foto hilft uns bei der ersten Einschätzung. Wenn Sie gerade keines zur Hand haben, können Sie uns zunächst kurz schreiben. Hersteller und Baujahr müssen Sie nicht kennen.</p>
+    <p>{intro}</p>
     <div class="quick-actions">
-      <a class="button primary" href={offerUrl}>Instrument mit Fotos anbieten</a>
+      <a class="button primary" href={offerUrl}>{primaryLabel}</a>
       <button class="button secondary" type="button" data-quick-open aria-expanded="false" aria-controls="quick-inquiry-form" hidden>Erst einmal Kontakt aufnehmen</button>
     </div>
+    {contactHint && <p class="mini-note">{contactHint}</p>}
   </div>
   <form id="quick-inquiry-form" data-quick-form hidden>
     <div class="field"><label for="quick-story">Was möchten Sie anbieten?</label><textarea id="quick-story" name="story" rows="3" maxlength="1500" required placeholder="Zum Beispiel: Ein älterer Kontrabass aus einem Nachlass."></textarea></div>
