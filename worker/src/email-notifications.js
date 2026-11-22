@@ -176,7 +176,7 @@ export async function dispatchEmails(env, { leadId, nowMs = Date.now(), fetcher 
       continue;
     }
     if (row.attempts >= MAX_ATTEMPTS) {
-      await env.LEADS.prepare(`UPDATE email_notification_outbox SET status='failed',last_error='handoff_exhausted',updated_at=?
+      await env.LEADS.prepare(`UPDATE email_notification_outbox SET status='failed',last_error=CASE WHEN last_error='' THEN 'handoff_unacknowledged' ELSE last_error END,updated_at=?
         WHERE id=? AND status IN (${ACTIVE})`).bind(now, row.id).run();
       continue;
     }
@@ -189,7 +189,8 @@ export async function dispatchEmails(env, { leadId, nowMs = Date.now(), fetcher 
     let status = "retry", error = "handoff_network_error";
     try {
       const response = await fetcher(env.EMAIL_WEBHOOK_URL, {
-        method: "POST", redirect: "error", signal: AbortSignal.timeout(10_000),
+        // workerd supports only follow/manual. Never forward credentials on redirects.
+        method: "POST", redirect: "manual", signal: AbortSignal.timeout(10_000),
         headers: { "Content-Type": "application/json", "X-Webhook-Secret": env.EMAIL_WEBHOOK_SECRET, "Idempotency-Key": row.id },
         body: JSON.stringify({ event: "lead.email.requested", notification_id: row.id }),
       });

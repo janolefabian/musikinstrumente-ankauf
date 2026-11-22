@@ -81,7 +81,7 @@ test("webhook delivery is leased, bounded, retryable and 2xx is not an email-sen
   try {
     await enqueue(env);
     const fetcher = async (url, options) => {
-      count++; assert.equal(options.redirect, "error");
+      count++; assert.equal(options.redirect, "manual");
       assert.equal(JSON.parse(options.body).notification_id, "lead-email:TEST-1");
       assert.doesNotMatch(options.body, /PRIVATE|owner@example/);
       return new Response("accepted", { status: 200 });
